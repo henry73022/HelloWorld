@@ -1,0 +1,22 @@
+apply plugin: 'java'
+apply plugin: 'war'
+apply plugin: 'eclipse-wtp'
+
+sourceCompatibility = 1.7 //設置JDK版本
+webAppDirName = 'WebContent' //設置WebApp根目錄
+sourceSets.main.java.srcDir 'src' //設置JAVA原碼所在目錄
+
+//設置maven庫地址
+repositories{
+	mavenCentral()
+}
+
+//設置依賴
+dependencies{
+	providedCompile 'javax.servlet:servlet-api:2.5' //編譯期
+	providedRuntime 'javax.servlet:jstl:1.2' //運行時
+	compile group: 'org.springframework', name: 'spring-webmvc', version: '4.3.2.RELEASE'
+	compile group: 'log4j', name: 'log4j', version: '1.2.17'
+	compile("org.springframework.boot:spring-boot-starter-web:1.1.5.RELEASE")
+	compile group: 'com.google.code.gson', name: 'gson', version: '2.7'
+}

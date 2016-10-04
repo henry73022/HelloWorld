@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:schemaLocation="http://www.springframework.org/schema/beans
+http://www.springframework.org/schema/beans/spring-beans-3.0.xsd">
+
+<!-- bean元素的作用是，當Spring框架加載時，Spring會自動創建一個 UserService物件再賦予物件屬性值-->
+	<bean id="userservice" class="com.service.UserService">
+	<!-- 注入屬性name的值 -->
+		<property name="name">
+			<value>測試~~~~</value>
+		</property>
+	</bean>
+	
+<!-- 	<bean id="gson" class="com.google.gson" /> -->
+	
+	<bean id="book" class="com.test.json.Book">
+	<!-- 注入屬性name的值 -->
+		<property name="isbn">
+			<value>956-987236-1</value>
+		</property>
+		<property name="name">
+			<value>Java歷險記</value>
+		</property>
+		<property name="price">
+			<value>400</value>
+		</property>
+		<property name="list">
+			<list>
+				<value>一</value>
+				<value>二</value>
+				<value>三</value>
+				<value>四</value>
+				<value>五</value>
+			</list>			
+		</property>
+	</bean>
+
+
+</beans>
