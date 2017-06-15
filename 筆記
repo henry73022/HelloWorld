@@ -1,0 +1,14 @@
+CCVOCRImp(一般卡批次進件)  徵審邏輯筆記  (D:\Batch_VB\CCVOCRImp)
+(A)當之前推關卡失敗時，程式執行時在推一次關卡
+1.開啟程式後程式進入點Module1.vb 執行 job.exec()方法執行排程
+2.CCVOCRImpJob的exec()方法後會先執行OCRImpMonitor方法
+3.OCRImpMonitor方法先查詢DB_Credit資料庫的WF_FlowCase表(條件為WF_FlowCase.FlowCurrStepID = 'CCV0000' & WF_FlowCase.FlowCaseStatus = 'Open')
+4.透過條件查詢出來的資料，透過若PaperID有值，查詢CCSDB資料庫的CC_ApplyCaseExamine表(查詢條件:PaperID = RefNBR)
+5.如果CC_ApplyCaseExamine查詢出的資料筆數大於0筆，CC_ApplyCaseExamine的ImportFlowState欄位的值不為空代表這筆資料之前推關卡有失敗，因此將WF_FlowCase的Row、CC_ApplyCaseExamine的ImportFlowState值傳入CV_TwoGoNextStep方法執行預存程序推關卡
+(B)執行方法(1.A:OCR() 2. B:不齊件補件區() 3. TOGO())1.OCR區塊【1】USERDB資料庫tbl_OCRXML_M_OCRUP1表查詢ToCMS=0(未進件)的資料【2】查詢出未進件的資料後跑迴圈【3】根據tbl_OCRXML_M_OCRUP1表的DATA_LINE值執行流程得到CC_ApplyCreditCardTemp表【4】根據CC_ApplyCreditCardTemp表RefNBR的值執行關卡推進作業(進件成功將tbl_OCRXML_M_OCRUP1表的ToCMS設為1表示進件成功，進件失敗將ToCMS設為9表示重覆進件)
+(C)執行TOGO監聽匯入作業【1】查詢WF_FlowCase表條件為FlowCaseRow.FlowCurrStepID = "CCV0200" and FlowCaseRow.FlowCaseStatus = "Open"【2】跑迴圈取查尋出的PaperID值，透過PaperID(CC_ApplyCase的RefNBR = PaperID)值查詢CCSDB資料庫的CC_ApplyCase表【3】如果查詢出的CC_ApplyCase筆數大於0，透過CheckAddBankCus方法確認是否已加入本行客戶(如果已加入本行客戶，將USERDB的tbl_ToGo_M_CardApply表的Iweb_St值設為2【處理中】，回報monitor系統，Update CC_ApplyCaseExamine set CVStatus=’4’)【4】執行CV_TwoGoNextStep方法推流程
+
+
+
+-----------------------------------------
+
