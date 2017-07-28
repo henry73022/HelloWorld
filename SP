@@ -1,0 +1,234 @@
+USE [FISCDB]
+GO
+/****** Object:  StoredProcedure [dbo].[sp_FISC_M_GetNoticeList]    Script Date: 07/28/2017 10:29:16 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+-- =============================================
+-- Author:		<Author,,Name>
+-- Create date: <Create Date,,>
+-- Description:	<Description,,>
+-- =============================================
+ALTER PROCEDURE [dbo].[sp_FISC_M_GetNoticeList]
+	-- Add the parameters for the stored procedure here
+	@DateStart  varchar(15),
+	@DateEnd  varchar(15),
+	@Type     varchar(20)
+AS
+BEGIN
+	-- SET NOCOUNT ON added to prevent extra result sets from
+	-- interfering with SELECT statements.
+	SET NOCOUNT ON;
+	
+	
+	--drop table #TMP_FS301
+	Create Table #TMP_FS301(
+	TNO			varchar(16),
+	TDate		varchar(8),
+	TerminalID	varchar(10),
+	MerchID	varchar(15),
+	MerchID_Mom	varchar(15),
+	TradeAddr	varchar(200),
+	ContName	varchar(20),
+	ContTel	varchar(15),
+	TermType	varchar(20),
+	TermModel	varchar(20),
+	TermFactory	varchar(30),
+	Status	varchar(1),
+	CloseDT	varchar(8),
+	CloseID	varchar(10),
+	MEMO	varchar(200),
+	MDate	datetime,
+	MUUID	varchar(10),
+	MerchName	varchar(40),
+	MerchName_Mon	varchar(40),
+	Notice_Date varchar(16),
+	Notice_Final_Date varchar(16)
+)	
+
+
+	
+	insert into #TMP_FS301
+	select X.*,replace(replace(replace(convert(char(16),DATEADD(hour,Y.Notice,X.MDATE),120),' ',''),'-',''),':','') AS Notice_Date,replace(replace(replace(convert(char(16),DATEADD(hour,Y.Notice_Final,X.MDATE),120),' ',''),'-',''),':','') AS Notice_Date_Date
+	from ( select A.* ,ISNULL(B.MERCHNAME,'　') AS MERCHNAME ,ISNULL(B.MERCHNAME_MOM,'　') AS MERCHNAME_MON 
+		   from tbl_FISC_M_Terminal_Repair A    
+		   left join ( SELECT MERCHID, MERCHNAME, MERCHID_MOM, MERCHNAME_MOM  FROM tbl_FISC_M_MerchRelation WHERE STATUS <> '7' ) B  
+		   on  A.MERCHID = B.MERCHID AND A.MERCHID_MOM = B.MERCHID_MOM 
+		 ) X, [FISCDB].[dbo].[tbl_FISC_C_ParaCode] Y
+	WHERE Y.ctype = '002' and Y.CSUB = X.TermType and X.Status <> '5' and X.Status <> '7' 
+
+	--select * from #TMP_FS301
+
+
+--drop table #TMP_FS106
+	Create Table #TMP_FS106(
+	Dispatch_No varchar(20),
+	Dispatch_Date varchar(8),
+	Category  varchar(1),
+	Status varchar(1),
+	Expected_Date varchar(8),
+	Complete_Date varchar(8),
+	Memo varchar(800),
+	C_Date datetime,
+	Merch_Id varchar(15),
+	Terminal_Id varchar(10),
+	Vendor_No varchar(4),
+	Property_No varchar(20),
+	Fitting_Flg1 char(1),
+	Fitting_Property1 varchar(8),
+	Fitting_Flg2 char(1), 
+	Fitting_Property2 varchar(8),
+	Fitting_Flg3 char(1),
+	Fitting_Property3 varchar(8),
+	Fitting_Flg4 char(1),
+	Fitting_Property4 varchar(8),
+	Fitting_Flg5 char(1),
+	Fitting_Property5 varchar(8),
+	OldTerminal_Id varchar(10),
+	Notice_Date varchar(16),
+	Notice_Final_Date varchar(16)
+)	
+	
+	insert into #TMP_FS106
+	select X.*,replace(replace(replace(convert(char(16),DATEADD(hour,Y.Notice,X.C_Date),120),' ',''),'-',''),':','') AS Notice_Date,replace(replace(replace(convert(char(16),DATEADD(hour,Y.Notice_Final,X.C_Date),120),' ',''),'-',''),':','') AS Notice_Date_Date
+	from ( 
+			select C.Dispatch_No, C.Dispatch_Date, C.Category, C.Status, C.Expected_Date, C.Complete_Date, C.Memo, C.C_Date,
+				A.Merch_Id, A.Terminal_Id, A.Vendor_No, dbo.fun_TerminalPropertyNo_Combine(A.Terminal_Id) as Property_No, A.Fitting_Flg1, A.Fitting_Property1, A.Fitting_Flg2, A.Fitting_Property2, A.Fitting_Flg3, A.Fitting_Property3, A.Fitting_Flg4, A.Fitting_Property4, A.Fitting_Flg5, A.Fitting_Property5, C.OldTerminal_Id  
+			from tbl_FISC_M_Terminal A left JOIN tbl_FISC_M_Dispatch_Terminal B on A.Terminal_Id = B.Terminal_Id left JOIN tbl_FISC_M_Dispatch C on B.Dispatch_No = C.Dispatch_No 
+		 ) X, [FISCDB].[dbo].[tbl_FISC_C_ParaCode] Y
+	WHERE Y.ctype = '002' and Y.CSUB = X.Vendor_No and (X.Status = '1' or X.Status = '2' )
+
+	--select * from #TMP_FS106
+
+ 
+                          
+	
+	
+	
+	--drop table #TMP_List
+	Create Table #TMP_List(
+	List_No		varchar(12),
+	Flag		varchar(1),
+)	
+	
+	
+	--Declare @DateStart  varchar(15)
+	--Declare @DateEnd  varchar(15)
+	--Declare @Type     varchar(20)
+	
+	
+	Declare @DateIndex  varchar(15)
+	Declare @i     int
+	Declare @count     int
+	
+	--set @DateStart = '20161012'
+	--set @DateEnd   = '20161111'
+	--set @Type      = 'FS301_Notice_Final'
+	set @DateIndex = @DateStart
+	
+	
+	set @i = (DATEDIFF ( Day , @DateStart , @DateEnd )) + 1
+	
+	
+	
+	--FS301端末機報修查詢提醒時間CASE
+	if @Type = 'FS301_Notice' 
+	begin
+		while @i > 0
+		begin
+			--Declare @DateIndex  varchar(15)
+			--set @DateIndex = '20161012'
+			
+			
+			select @count = count(*) from #TMP_FS301 where Notice_Date < @DateIndex + '0930'
+			
+			if @count > 0
+			begin
+				insert into #TMP_List values (@DateIndex+'0930','Y')
+			end 
+			
+			select @count = count(*) from #TMP_FS301 where Notice_Date < @DateIndex + '1430'
+			
+			if @count > 0
+			begin
+				insert into #TMP_List values (@DateIndex+'1430','Y')
+			end 
+			
+			
+			
+			select @DateIndex = replace(replace(replace(convert(char(10),DATEADD(day,1,@DateIndex),120),' ',''),'-',''),':','') 
+			set @i = @i-1
+			
+		end
+	end
+	
+	
+	--FS301端末機報修查詢最後通牒CASE
+	if @Type = 'FS301_Notice_Final' 
+	begin
+		while @i > 0
+		begin
+			
+			select @count = count(*) from #TMP_FS301 where Notice_Final_Date < @DateIndex + '0930'
+			
+			if @count > 0
+			begin
+				insert into #TMP_List values (@DateIndex+'0930','Y')
+			end 
+			
+			
+			select @DateIndex = replace(replace(replace(convert(char(10),DATEADD(day,1,@DateIndex),120),' ',''),'-',''),':','') 
+			set @i = @i-1
+			
+		end
+	end
+	
+	--FS106端末機派工查詢提醒時間CASE
+	if @Type = 'FS106_Notice' 
+	begin
+		while @i > 0
+		begin
+			
+			select @count = count(*) from #TMP_FS106 where Notice_Final_Date < @DateIndex + '0930'
+			
+			if @count > 0
+			begin
+				insert into #TMP_List values (@DateIndex+'0930','Y')
+			end 
+			
+			
+			select @DateIndex = replace(replace(replace(convert(char(10),DATEADD(day,1,@DateIndex),120),' ',''),'-',''),':','') 
+			set @i = @i-1
+			
+		end
+	end
+	
+	
+	--FS106端末機派工查詢最後通牒CASE
+	if @Type = 'FS106_Notice_Final' 
+	begin
+		while @i > 0
+		begin
+			
+			select @count = count(*) from #TMP_FS106 where Notice_Final_Date < @DateIndex + '0930'
+			
+			if @count > 0
+			begin
+				insert into #TMP_List values (@DateIndex+'0930','Y')
+			end 
+			
+			
+			select @DateIndex = replace(replace(replace(convert(char(10),DATEADD(day,1,@DateIndex),120),' ',''),'-',''),':','') 
+			set @i = @i-1
+			
+		end
+	end
+	
+	select top 100 * from #TMP_List
+	
+	
+	
+    -- Insert statements for procedure here
+ 
+END
