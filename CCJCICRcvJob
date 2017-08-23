@@ -1,0 +1,85 @@
+CCJCICRcvJob(聯徵紀錄查詢結果邏輯)
+
+1.
+ 查詢WF_FlowCase(左岸卡CBCJ000、一般卡CCVJ000、永調卡CDAJ000) 的案件
+
+2.
+跑迴圈逐筆取出WF_FlowCase案件的PaperID(申編)，透過申編查詢CC_JCIC_SEQ表獲取相關的送聯徵查詢資料。
+
+3.
+跑迴圈逐筆透過CC_JCIC_SEQ表的CreateDate欄位判斷該筆資料距離當下執行批次的時間是否超過18分鐘，如果沒有超過18分鐘則跳過此筆資料不做任何動作。
+
+4.
+第3點判斷結果如果時間有超過18分鐘，接下來判斷JCIC_Status(JCIC查詢狀態)是否為SENT，如果不為SENT則不做任何動作。
+
+5.
+第4點判斷結果為SENT，取出Provider(存放的值為XML或HTML)。
+
+6.
+Provider為HTML:
+(a)透過CC_JCIC_SEQ的JCIC_Seq_No(查詢JCIC流水號)查詢SMARDCARD25資料庫的tb_inquiry_task、tb_inquiry兩張表，獲取到tb_inquiry表的Status(JCIC查詢結果)。
+
+(b)查詢不到資料不做任何事。
+
+(c)有查詢到資料則判斷Status是否為D0000(查詢完成)，不為D0000則不做事，將Status值後面加上F回傳回去(最後更新回CC_JCIC_SEQ表示查詢失敗)。
+
+
+
+
+
+
+
+(d) Status為D0000，透過Service Code及JCIC_Seq_No(查詢流水號)查詢SMARDCARD25資料庫，SQL如下:
+SELECT d.item_code, a.appl_no, e.content
+ FROM tb_inquiry_task a with(nolock) 
+, tb_inquiry b with(nolock) LEFT JOIN tb_item_cache_info c with(nolock) ON c.iid = b.item_cache_info
+, tb_item_definition d with(nolock) 
+, tb_cache e with(nolock) 
+ WHERE a.tid = b.tid
+ AND b.item_definition = d.iid
+ AND c.row_data_cache = e.cid
+ AND b.discriminator = 's'
+ AND a.appl_no = 'JCIC查詢流水號'
+ AND d.item_code = '要查的Service Code'
+
+(e)
+從SMARDCARD25資料庫查詢結果成功:
+更新CC_JCIC_SEQ表，將JCIC_Status(JCIC查詢狀態)更改為D0000，並將SMARDCARD25查詢到的e.content寫入到HTMLContent欄位。
+(HTMLContent欄位保存的資料為HTML格式的用戶查詢資料)
+
+(f)
+從SMARDCARD25資料庫查詢結果Status不為D0000:
+更新CC_JCIC_SEQ表，將SMARDCARD25資料庫查詢獲取的Status更新至JCIC_Status(JCIC查詢狀態)欄位。
+
+7.
+Provider為XML:
+(a)透過CC_JCIC_SEQ的JCIC_Seq_No(查詢JCIC流水號)查詢SMARDCARD25資料庫的tb_inquiry_task、tb_inquiry兩張表，獲取到tb_inquiry表的Status(JCIC查詢結果)。
+
+(b)從SMARDCARD25得到的Status不為D0000，將tb_inquiry表的Status更新到CC_JCIC_SEQ表的JCIC_Status(JCIC查詢狀態)欄位。
+
+
+
+
+(c) 從SMARDCARD25得到的Status為D0000:
+根據CC_JCIC_SEQ的ServiceCode查詢SC_SysConfig表，獲取Reserved的欄位值(Reserved存放的內容為該ServiceCode要查的atom項目)，先將CCSDB對應的CC_JCIC_ + atomName的table資料清除，再將從SMARDCARD25取到的資料塞回
+CC_JCIC_ + atomName的table，並記錄在SMARDCARD25獲取到的atom資料筆數。
+(SMARDCARD25的項目表名稱為atom名，CCSDB的項目表名稱為CC_JCIC_ + atomName)
+
+(d)更新CC_JCIC_SEQ表，將JCIC_Status更新為D0000，將(c)紀錄在SMARDCARD25獲取到的atom資料筆數insert到HTMLContent欄位。
+(HTMLContent欄位存放的值為 EX: APS001:1,AAS003:1 【APS001為smardcard25的atom表名，1為從smardcard25的atom找到的資料筆數】)
+
+8.
+透過WF_FlowCase的PaperID(申編)查詢CC_JCIC_SEQ表獲取資料的筆數。(cntAll)
+
+9.
+根據申編(AcRefNbr)查詢CC_JCIC_SEQ表獲取JCIC_Status欄位值為D0000的資料筆數。(cntRved)
+
+10.
+判斷是否都接收(cntAll <> 0 AndAlso cntAll = cntRved)，更新CC_ApplyCaseExamine、發送通知。
+
+11.
+(關卡:左岸卡CBCJ000、一般卡CCVJ000、永調卡CDAJ000)的案件需執行預存[DB_Credit].dbo.[SP_WF_GoNextStep]跳關卡。
+
+
+12.
+更新SC_BatchResult
