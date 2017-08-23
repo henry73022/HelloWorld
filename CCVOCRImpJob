@@ -1,0 +1,54 @@
+CCVOCRImpJob(一般卡批次進件邏輯)
+
+OCRImpMonitor (當推關卡失敗時，程式執行時在推一次關卡)
+1.執行CCVOCRImpJob批次時，先撈取WF_FlowCase表關卡在信用卡進件一登(CCV0000)的關卡，查詢出資料後，跑迴圈逐筆取出資料，透過徵信聯絡單號(RefNBR)到CC_ApplyCaseExamine(徵信案件作業結果檔)查詢案件，如果CC_ApplyCaseExamine表的ImportFlowState(推關卡註記)欄位有值，表示之前推關卡的時候有失敗過，須在推一次關卡，將關卡推至ImportFlowState欄位紀錄的關卡。
+
+OCR進件
+1.查詢外部資料庫USERDB的tbl_OCRXML_M_OCRUP1表，查詢出ToCMS欄位為0(ToCMS = 0表示未進件)的資料。
+
+2.根據tbl_OCRXML_M_OCRUP1表的DATA_LINE欄位(DATA_LINE存的資料為電文格式的字串)獲取到CC_ApplyCreditCardTempRow，再根據CC_ApplyCreditCardTempRow的徵信聯絡單號(RefNbr)進行推關卡的動作，推關卡最多試3次，如果嘗試3次都失敗，將要推的關卡代號記錄在CC_ApplyCaseExamine表的ImportFlowState(推關卡註記)欄位。
+
+3.進件成功後，更新tbl_OCRXML_M_OCRUP1表的ToCMS欄位，將ToCMS設為1表示已成功進件。
+
+4.將結果寫入SC_BatchResult表，將成功、失敗的訊息記錄起來(WorkFlag = 1表示成功，WorkFlag = 9表示失敗)。
+
+不齊件補件
+1.查詢外部資料庫USERDB的tbl_CMS_OCRUP1_ToCMS表，查詢出ToCMS欄位為0(ToCMS = 0表示未進件)、Source欄位值為B的資料。
+
+2.其餘做的事情與OCR進件差不多(差別在於USERDB撈取的Table)。
+
+TOGO
+1.查詢外部資料庫USERDB的tbl_ToGo_M_CardApply表，查詢出Status欄位值為1的資料。
+
+2.跑迴圈逐筆取出資料，根據OCRUP1欄位(存的資料為電文格式的字串)及SourceType(進件來源)獲取到ApplyCreditCardTempRow。
+
+3.更新tbl_ToGo_M_CardApply表，將Status值改為2
+4.根據ApplyCreditCardTempRow與tbl_ToGo_M_CardApply判斷該案件是否為本行客戶。
+
+5.根據判斷該案件是否為本行客戶的結果更新tbl_ToGo_M_CardApply表。
+
+6.推關卡，最多試3次，如果嘗試3次都失敗，將要推的關卡代號記錄在CC_ApplyCaseExamine表的ImportFlowState(推關卡註記)欄位。
+
+7.將結果寫入SC_BatchResult表，將成功、失敗的訊息記錄起來(WorkFlag = 1表示成功，WorkFlag = 9表示失敗)。
+
+TOGO監聽匯入作業
+1.撈取WF_FlowCase表，找出關卡代號為CCV0200(代勾稽聯徵同意書)的案件。
+
+2.根據徵信聯絡單號(RefNbr)判斷是否已加入本行客戶。
+
+3.如果已加入本行客戶，更新tbl_ToGo_M_CardApply表，將IWEB_ST欄位值改為2(處理中)，更新CC_ApplyCaseExamine表的CVStatus(徵信狀態)將值設為4(待外部資料查詢)
+
+4.關卡推進。
+
+
+補充說明:
+1.
+OCR =>紙本文件掃描進件
+2.
+JCIC =>聯徵中心(可查詢用戶在各個銀行的信用報告)
+3.
+一般卡進件分4種方法:
+(1)OCR進件
+(2)不齊全補件
+(3)ToGo進件
+(4)Web UI進件(人工進件)
