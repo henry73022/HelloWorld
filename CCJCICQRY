@@ -1,0 +1,91 @@
+CCJCICQRY(聯徵紀錄查詢請求)流程
+步驟一:
+=====================執行錯誤自動查詢機制============================
+1.
+查詢CC_JCIC_SEQ表，將JCIC_Status(JCIC查詢狀態)欄位值開頭為E及JCIC_Seq_No (JCIC查詢流水號)欄位值開頭為Crd的資料撈取出來。
+
+2.
+針對從CC_JCIC_SEQ表撈取出來的資料透過判斷CreateDate欄位判斷該案件是否為當天內的案件。
+(a)不是當天內的案件:不做重新查詢的動作。
+
+(b)判斷結果為當天內的案件:
+I.	更新CC_JCIC_SEQ表，將JCIC_Seq_No欄位更新為新的JCIC查詢序號，JCIC_Status(JCIC查詢狀態)欄位更新為INIT。
+II.	更新CC_ApplyCaseExamine表，更新以下欄位:
+(1) JCICDataDt(聯徵資料查詢日期)設置為Nothing。
+(2) QueryJCICState(JCIC查詢結果)設置為2。  ==>(欄位值為2表示重新查詢)
+(3) LastChgDate(異動時間)更改為當下更新資料的時間。
+
+3.
+查詢CC_JCIC_SEQ表，透過LastChgDate將時間超過60分鐘且JCIC_Status(JCIC查詢狀態)值為SENT且JCIC_Seq_No(JCIC查詢流水號)欄位值開頭為Crd的資料撈出來。
+
+4.
+針對從CC_JCIC_SEQ表撈取出來的資料，透過JCIC_Seq_No (JCIC查詢流水號)到SMARDCARD25查詢tb_inquiry_task、tb_inquiry兩張表，取得tb_inquiry的STATUS、SEND_STATUS、RECEIVE_STATUS三個欄位的值。
+
+
+
+
+
+
+
+
+5.
+如果透過JCIC_Seq_No (JCIC查詢流水號)到SMARDCARD25撈取不到資料:則判斷該案件是否為當天的案件。
+(a)不是當天內的案件:不做重新查詢的動作。
+
+(b)判斷結果為當天內的案件:
+III.	更新CC_JCIC_SEQ表，將JCIC_Seq_No欄位更新為新的JCIC查詢序號，JCIC_Status(JCIC查詢狀態)欄位更新為INIT。
+IV.	更新CC_ApplyCaseExamine表，更新以下欄位:
+(1) JCICDataDt(聯徵資料查詢日期)設置為Nothing。
+(2) QueryJCICState(JCIC查詢結果)設置為2。  ==>(欄位值為2表示重新查詢)
+(3) LastChgDate(異動時間)更改為當下更新資料的時間。
+
+6.
+如果透過JCIC_Seq_No (JCIC查詢流水號)到SMARDCARD25撈取到資料:
+判斷從SMARDCARD25獲取的STATUS (JCIC查詢狀態)是否為空值或是NULL:
+I.	如果JCIC查詢狀態為空值或NULL，不需做重新查詢的動作。
+II.	如果JCIC查詢狀態不為空值或NULL，判斷此案件是否為當天內的案件且SMARDCARD25獲取的SEND_STATUS值為3或10或13
+III.	
+判斷條件成立:
+(1)更新CC_JCIC_SEQ表，將JCIC_Seq_No欄位更新為新的JCIC查詢序號，JCIC_Status(JCIC查詢狀態)欄位更新為INIT。
+(2)更新CC_ApplyCaseExamine表，更新以下欄位:
+(1) JCICDataDt(聯徵資料查詢日期)設置為Nothing。
+(2) QueryJCICState(JCIC查詢結果)設置為2。  ==>(欄位值為2表示重新查詢)
+(3) LastChgDate(異動時間)更改為當下更新資料的時間。
+
+=====================錯誤自動查詢機制結束============================
+
+
+
+
+
+
+
+
+
+步驟二:
+1.
+從WF_FlowCase表取得FlowCurrStepID欄位值為CBCJ000(左岸卡待JCIC作業)、CCVJ000(一般卡待JCIC作業)、CDAJ000(永調卡待JCIC作業)的案件。
+
+2.
+根據產品代碼到SC_SysConfig表查詢出需送查詢的service code (PamValue欄位)，將須送查詢的Service Code及用戶的相關資料insert到CC_JCIC_SEQ表，將CC_JCIC_SEQ表的JCIC查詢狀態(JCIC_Status)設置為INIT
+
+步驟三:
+1.根據徵信聯絡單號(refNbr)到CC_JCIC_SEQ表撈取案件資料。
+
+2.跑迴圈逐筆取出資料判斷該案件的JCIC查詢狀態(JCIC_Status)是否為INIT
+
+3.如果JCIC_Status為INIT，將service code 及 傳輸模式 insert到JCICASK資料庫的TASKITEM表，再將CC_JCIC_SEQ(JCIC查詢批次明細檔)表JCIC_Status為【INIT】更新為【SEND】(insert失敗改成SENDF)
+
+4. CC_JCIC_SEQ "全部"完成後回頭更新 CC_ApplyCase表
+
+5.更新SC_BatchResult表(批次執行結果檔)
+
+
+
+補充說明:
+qMode(傳輸模式):AUTO(超過一個月採NOCACHE、一個月內採CACHE)、NOCACHE(強制查聯徵)、CACHE(查資料庫)
+
+差異: 
+NOCACHE  ==> 重新查詢有更新資料
+CACHE  ==> 重新查詢不更新資料
+AUTO  ==> 重新查詢，可能會更新資料，也可能不會更新資料
