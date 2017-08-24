@@ -1,0 +1,11 @@
+CaseDailyJob(每日特店徵審核准拒絕清單)邏輯筆記
+
+1.根據SQL條件查詢特店徵審已核准清單
+
+2.從SC_FileConfig(檔案格式定義檔)表查詢符合FileName='ApprovedFlie' and InOutFlag='O'的檔案路徑，
+  將清單內的資料寫入EXCEL檔，將EXCEL檔存放在DB指定的路徑。
+
+3.根據SQL條件查詢特店徵審取消與拒絕清單
+
+2.從SC_FileConfig(檔案格式定義檔)表查詢符合FileName='CanceledFlie' and InOutFlag='O'的檔案路徑，
+  將清單內的資料寫入EXCEL檔，將EXCEL檔存放在DB指定的路徑。
