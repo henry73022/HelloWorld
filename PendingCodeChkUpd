@@ -1,0 +1,21 @@
+PendingCodeChkUpd(補件狀態更新作業)邏輯筆記
+
+==========================左岸卡(公司卡)流程==========================
+1.
+從WF_FlowCase表查詢出符合條件FlowID = 'CBCA000' 且FlowCaseStatus = 'Open' 且FlowCurrStepID in('CBC2010','CBC3010')的案件資料。
+
+2.
+根據WF_FlowCase的PaperID(申請編號)查詢CC_ApplyCase表，如果有查詢到資料，根據CC_ApplyCase表的FMRefNBR及WF_FlowCase表的UpdDate到ocrdb資料庫的LOG_AddImage表查詢已補件影像檔的資料。
+
+3.
+如果有查詢到已補件影像檔的資料
+I.	insert資料到AuditLog_ApplyCase表
+II.	更新ApplyCase表，將CC_ApplyCase.Exp2Flag設定為0【Exp2Flag為0表示未產出】
+III.	更新ApplyCaseExamine表，將AccessorizeFlag【補件註記】設為0表示無補件
+IV.	補件完成，進行推關卡動作。
+
+=========================左岸卡(公司卡)流程結束=======================
+
+補充說明:
+此批次有做左岸卡(公司卡)流程及一般卡流程的補件，一般卡的流程做的事情與左岸卡一樣，只是撈出來的案件關卡條件不一樣。
+
