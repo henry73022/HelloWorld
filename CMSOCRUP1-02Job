@@ -1,0 +1,15 @@
+CMSOCRUP1-02Job(產出OCRUP1電文TXT檔案)邏輯筆記
+1.
+從CCSDB.SC_FileConfig【檔案格式定義檔】表根據檔案名稱(CMSOCRUP1或CMSOCRMM1)及InOutFlag為O【output File】獲取存放TXT的檔案路徑。
+SQL如下:
+select * from SC_FileConfig where  FileName = 'CMSOCRUP1' and InOutFlag = 'O'
+
+2.
+從CCSDB.CC_FileOutCtl【檔案匯出控制檔】表查詢FileKind = 1【OCRUP1】 and DataOutputFlag = N 【待產出】的資料清單
+
+
+3.
+逐筆取出清單資料，更新CCSDB.CC_FileOutCtl【檔案匯出控制檔】表，將DataOutputFlag設置為Y【已產出】
+
+4.
+將CCSDB.CC_FileOutCtl【檔案匯出控制檔】表DataContent【檔案內容】表保存的電文格式的字串內容寫入要匯出的TXT檔。
