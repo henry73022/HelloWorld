@@ -1,0 +1,51 @@
+CCRiskSumJob(本行客戶風險紀錄查詢)邏輯筆記
+
+1. 
+從CV_BatchListBSP表查詢出RunFlag='2'及(SumRunFlag為NULL或SumRunFlag='0')的資料，將資料的SumRunFlag值更新為1。
+
+2.
+查詢CV_BatchListBSP表撈出SysID欄位值為C 及SumRunFlag值為1的資料。
+
+3.
+撈取到資料後，跑迴圈逐筆取出CV_BatchListBSP表的資料。
+
+4.
+以CV_BatchListBSP表的UniNo為參數在Stakeholder資料庫執行預存程式SP_QryRM，找出利害關係人的資料，將資料更新到DB_CIM資料庫的CC_RiskSumList表(更新筆數如果為0，則將資料insert到CC_RiskSumList表)
+
+5.
+I.	根據CV_BatchListBSP表的UniNo執行以下SQL撈取是否有本行支存帳戶的資料
+Declare @strSQL as varchar(8000) Set @strSQL = 'Select * From OpenQuery([LNKElending], ''' + Replace(' select ac.RECID  from [ODS2_DBU].[dbo].CUSTOMER cu with (nolock)  inner join[ODS2_DBU].[dbo].ACCOUNT ac with (nolock) on cu.RECID = ac.CUSTOMER  where cu.T_MNEMONIC Like ''UniNo%''  And ac.CATEGORY in (''1100'', ''1140'')  and (ac.CLOSURE_DATE is NULL OR ac.CLOSURE_DATE='''') ', '''','''''') + ''')' Execute(@strSQL)
+
+II.	如果有資料，將資料更新到DB_CIM資料庫的CC_RiskSumList表(更新筆數如果為0，則將資料insert到CC_RiskSumList表)
+
+
+6.
+I.	根據refNBR與uniNo執行以下SQL獲取本行催收對象相關資料
+Select count(1) from CV_CreditType1CS  Where ApCvNo='refNBR' And UniNo= 'uniNo'  
+
+
+II.	如果有資料，將資料更新到DB_CIM資料庫的CC_RiskSumList表(更新筆數如果為0，則將資料insert到CC_RiskSumList表)
+
+7.
+I.	根據refNBR與uniNo執行以下SQL獲取本行不予承作客戶相關資料
+Select count(1) from CV_CreditType1Non  Where ApCvNo='refNBR' And UniNo= 'uniNo'
+
+II.	如果有資料，將資料更新到DB_CIM資料庫的CC_RiskSumList表(更新筆數如果為0，則將資料insert到CC_RiskSumList表)
+
+
+8.
+I.	根據refNBR與uniNo執行以下SQL獲取本行支存拒往客戶相關資料
+Select count(1) from CV_CreditType1Non  Where ApCvNo='refNBR' And UniNo= 'uniNo'
+
+II.	如果有資料，將資料更新到DB_CIM資料庫的CC_RiskSumList表(更新筆數如果為0，則將資料insert到CC_RiskSumList表)
+
+9.
+I.	根據refNBR與uniNo執行以下SQL獲取退票紀錄客戶相關資料
+Select count(1) from CV_CreditType3_RJ_Dtl  Where ApCvNo='refNBR' And UniNo= 'uniNo'
+
+II.	如果有資料，將資料更新到DB_CIM資料庫的CC_RiskSumList表(更新筆數如果為0，則將資料insert到CC_RiskSumList表)
+
+10.
+I.	更新CV_BatchListBSP表，將SumRunFlag欄位值設為2。
+II.	更新CC_ApplyCaseExamine表，將PolicyState【Policy完成註記】欄位值設為1【完成(該單所有關係人完成)】。
+
