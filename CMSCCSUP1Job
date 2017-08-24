@@ -1,0 +1,75 @@
+CMSCCSUP1Job(產出CCSUP1電文至資料表與TXT檔案)邏輯筆記
+1.
+執行以下SQL撈出匯出CCSUP1狀態為 0【未產出】的資料
+select ac.* from CCSDB.dbo.CC_ApplyCase ac with (nolock) 
+inner join DB_Credit.dbo.WF_FlowCase fc with (nolock) on ac.RefNBR=fc.PaperID 
+where ac.Exp2Flag ='0' and fc.FlowID in ('CCVA000','CBCA000')
+order by fc.CrDate, fc.UpdDate
+
+2.
+跑迴圈逐筆取出CC_ApplyCase表的RefNBR(申編)，判斷CC_ApplyCaseExamine表有無資料。
+
+3.
+根據CC_ApplyCaseExamine表的QuaResult【最終審核結果】判斷如果值不為2【核准】則不產檔。 ==> 非核准的ToGo案件不產檔
+
+4.
+案件經判斷為核准的ToGo案件後(QuaResult = 2)，根據CC_ApplyCase表的FMRefNBR(申請表申請編號)執行以下SQL判斷ToGo主檔，確認記名與否(未記名的To_Go案件不產檔)
+select Card_No, Account from tbl_ToGo_M_CardApply 
+where AppNo='fmRefNBR' and Card_No_Flag='1'
+
+5.
+根據電文分流組各個不同流程電文。
+I.	CBCA000
+-使用申編在ApplyCase搜尋是否有值，沒有則跳錯
+-使用申編在ApplyExamine搜尋是否有值，沒有則跳錯
+-使用申編在ApplyCompanyRow搜尋是否有值，沒有則不處理
+-使用申編在ApplyCreditCard搜尋是否有值，沒有則跳錯
+
+
+
+
+
+
+
+II.	CCVA000
+A.	srcType = C (getApplyCaseTITA_CV_ToGo)
+-使用申編在ApplyCase搜尋是否有值，沒有則跳錯
+-使用申編在ApplyExamine搜尋是否有值，沒有則跳錯
+-(MS=1)使用申編在ApplyCreditCard搜尋是否有值，沒有則跳錯
+-(MS=2)使用申編在ApplyCreditCard搜尋是否有值，沒有則跳錯
+
+B.	srcType  C (getApplyCaseTITA_CV)
+-使用申編在ApplyCase搜尋是否有值，沒有則跳錯
+-使用申編在ApplyExamine搜尋是否有值，沒有則跳錯
+-(MS=1)使用申編在ApplyCreditCard搜尋是否有值，沒有則跳錯
+-(MS=1)產出CCSUP1時，判斷CC_ApplyCreditCard的卡別卡面是否和CC_ApplyCreditFirst上 (用聯絡單號、ID為條件去比對)異同
+-(MS=2)使用申編在ApplyCreditCard搜尋是否有值，沒有則跳錯
+-(MS=2)產出CCSUP1時，判斷CC_ApplyCreditCard的卡別卡面是否和CC_ApplyCreditFirst上 (用聯絡單號、ID為條件去比對)異同
+
+6.
+將組出來的電文及相關資料insert到CCSDB.CC_FileOutCtl表，並將DataOutputFlag【資料產出註記】欄位值設為N【待產出】。
+
+7.
+判斷TOGO核准案件是否已記名，若案件為已記名，更新CC_ApplyCase表Exp2Flag【匯出CCSUP1狀態】欄位，產出電文 ==>Exp2Flag設為1【已產出】，不產出電文則設為2【不需產出】。
+
+8.
+如果CC_ApplyCase表SourceType(進件來源)為【C】(TOGO)，更新USERDB.tbl_ToGo_M_CardApply表。
+
+9.
+透過CCSDB.SC_FileConfig(搜尋FileName值為【CMSCCSUP1】，TOGO檔案路徑搜尋FileName值為【CMSCCSMM1】)獲取在DB配置的檔案路徑。
+
+10.
+取出CC_FileOutCtl(檔案匯出控制檔)表，DataOutputFlag值為【N】(待產出)的資料
+
+11.
+更新CC_FileOutCtl表，將DataOutputFlag值更新為Y【已產出】、DataOUTDate【資料產出日期】更新為當下執行批次的時間、FileName【檔案名稱】更新為對應的TXT名稱。
+
+12.
+CCSDB.CC_FileOutCtl資料根據CC_ApplyCase表的SourceType(進件來源)寫入電文CMSCCSUP1.txt 或 CMSCCSMM1.txt 或 CMSCCSMM2.txt  
+
+13.
+查詢DB_Credit.WF_FlowCase與CCSDB.CC_ApplyCase查詢案件符合以下條件的案件跳關卡到結案關卡(CCV9999)。
+I.	WF_FlowCase.FlowID = CBCA000,CCVA000 
+II.	WF_FlowCase.FlowCurrStepID = CBC6000,CCV6000
+III.	CC_ApplyCase.Exp2Flag【匯出CCSUP1狀態】不為0【未產出】 
+   
