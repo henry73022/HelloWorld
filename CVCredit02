@@ -1,0 +1,270 @@
+本行查詢(CVCredit02)邏輯
+
+1.
+執行CVCredit02，執行以下SQL:
+declare @TStamp as datetime;
+Set @TStamp = GETDATE();
+
+declare @admUID as varchar(6);
+set @admUID = 'CBATCH';
+
+-------------
+
+with t0 as(	--對每個RefNBR挑選出SecId不同的被授權人
+	  select a.RefNBR, b.SecId, b.SecIdOk
+	  from CCSDB.dbo.CC_ApplyCase a WITH (NOLOCK) 
+	  inner join  CCSDB.dbo.CC_ApplyCreditCard b on a.RefNBR=b.RefNBR
+	  group by a.RefNBR, b.SecId, b.SecIdOk
+),
+ta as(	--取得被授權人姓名
+	  select 
+	  t0.*
+	  , (
+	    select top 1 
+		AppChName
+		from CCSDB.dbo.CC_ApplyCreditCard b WITH (NOLOCK) 
+		where b.RefNBR=t0.RefNBR and b.SecId=t0.SecId
+		) AppChName
+	  , (
+	    select top 1 
+		AppEngName
+		from CCSDB.dbo.CC_ApplyCreditCard b WITH (NOLOCK) 
+		where b.RefNBR=t0.RefNBR and b.SecId=t0.SecId
+		) AppEngName
+	  from t0 	 
+)
+--=====================================================================
+Select 
+	SysID,ApCvNo
+	,ROW_NUMBER() over(partition by ApCvNo order by ApCvNo)
+	  +(select isnull(max(PNo),0) from DB_CIM.dbo.CV_BatchListBSP WITH (NOLOCK) where ApCvNo=TAll.ApCvNo)
+	  PNo
+	 ,ROW_NUMBER() over(partition by ApCvNo order by ApCvNo)
+	   +(select isnull(max(PNo),0) from DB_CIM.dbo.CV_BatchListBSP WITH (NOLOCK) where ApCvNo=TAll.ApCvNo)
+	   CmpNo
+	,AppNo, UniNo, UniNoErr, CName, IdenCd, RelCd 
+	,AOEmpID, AODeptNo, APKindCode, LoanKind, RunFlag 
+	,CreateDate, LastChgDeptNo, LastChgID, LastChgDate
+	,FUNINO,ENAME
+From (
+	Select --被授權人
+	'C' SysID,
+	A.RefNBR ApCvNo
+	, A.FMRefNBR AppNo, ta.SecId UniNo, ta.SecIdOk UniNoErr, ta.AppChName CName, '' IdenCd, '' RelCd 
+		, @admUID AOEmpID, CrUsr.DeptID AODeptNo, '01' APKindCode, A.ApType LoanKind, '0' RunFlag 
+		, @TStamp CreateDate, LcUsr.DeptID LastChgDeptNo, @admUID LastChgID, @TStamp LastChgDate 
+		, '' FUNINO, ta.AppEngName ENAME
+	From CCSDB.dbo.CC_ApplyCase A WITH (NOLOCK) 
+	inner join ta on ta.RefNBR =A.RefNBR
+	Inner Join CCSDB.dbo.CC_ApplyCaseExamine Exam on Exam.RefNBR = A.RefNBR
+	left join DB_Credit.dbo.SC_User CrUsr on CrUsr.UserID=@admUID 
+	left join DB_Credit.dbo.SC_User LcUsr on LcUsr.UserID=@admUID
+	Where 
+	Exam.QueryBSPState = '0'
+	And (ta.RefNBR + ta.SecId) Not In (Select isnull(ApCvNo,'') + isnull(UniNo,'') From DB_CIM.dbo.CV_BatchListBSP WITH (NOLOCK))
+	Union
+	Select --公司
+	'C' SysID,
+	A.RefNBR ApCvNo
+	, A.FMRefNBR AppNo, Company.GUICode UniNo, '' UniNoErr, Company.CompChnName CName, '' IdenCd, '' RelCd
+		, @admUID AOEmpID, CrUsr.DeptID AODeptNo, '01' APKindCode, A.ApType LoanKind, '0' RunFlag 
+		, @TStamp CreateDate, LcUsr.DeptID LastChgDeptNo, @admUID LastChgID, @TStamp LastChgDate 
+		, '' FUNINO, Company.CompEngName ENAME
+	From CCSDB.dbo.CC_ApplyCase A WITH (NOLOCK) 
+	Inner Join CCSDB.dbo.CC_ApplyCaseExamine Exam on Exam.RefNBR = A.RefNBR
+	inner join CCSDB.dbo.CC_ApplyCompany Company on Company.RefNBR=A.RefNBR
+	left join DB_Credit.dbo.SC_User CrUsr on CrUsr.UserID=@admUID 
+	left join DB_Credit.dbo.SC_User LcUsr on LcUsr.UserID=@admUID
+	Where 
+	 Exam.QueryBSPState = '0'
+	And (A.RefNBR + Company.GUICode) Not In (Select isnull(ApCvNo,'') + isnull(UniNo,'') From DB_CIM.dbo.CV_BatchListBSP WITH (NOLOCK))
+	
+	Union --特殊處理Company.CeoPersonID
+	Select 
+	'C' SysID,
+	A.RefNBR ApCvNo
+	, A.FMRefNBR AppNo, Company.CeoPersonId UniNo, '' UniNoErr, Company.CeoChnName CName, '' IdenCd, '' RelCd
+		, @admUID AOEmpID, CrUsr.DeptID AODeptNo, '01' APKindCode, A.ApType LoanKind, '0' RunFlag 
+		, @TStamp CreateDate, LcUsr.DeptID LastChgDeptNo, @admUID LastChgID, @TStamp LastChgDate 
+		, '' FUNINO, Company.CeoEngName ENAME
+	From CCSDB.dbo.CC_ApplyCase A WITH (NOLOCK) 
+	Inner Join CCSDB.dbo.CC_ApplyCaseExamine Exam on Exam.RefNBR = A.RefNBR
+	inner join CCSDB.dbo.CC_ApplyCompany Company on Company.RefNBR=A.RefNBR
+	left join DB_Credit.dbo.SC_User CrUsr on CrUsr.UserID=@admUID 
+	left join DB_Credit.dbo.SC_User LcUsr on LcUsr.UserID=@admUID
+	Where 
+	Exam.QueryBSPState = '0' And
+	 (A.RefNBR + Company.CeoPersonId) Not In (Select isnull(ApCvNo,'') + isnull(UniNo,'') From DB_CIM.dbo.CV_BatchListBSP WITH (NOLOCK))
+
+	Union --特殊處理單申附卡CreditCard.PrimId
+	Select distinct 
+	'C' SysID,
+	A.RefNBR ApCvNo
+	, A.FMRefNBR AppNo, ccard.PrimId UniNo, '' UniNoErr, '' CName, '' IdenCd, '' RelCd
+		, @admUID AOEmpID, CrUsr.DeptID AODeptNo, '01' APKindCode, A.ApType LoanKind, '0' RunFlag 
+		, @TStamp CreateDate, LcUsr.DeptID LastChgDeptNo, @admUID LastChgID, @TStamp LastChgDate 
+		, '' FUNINO, A.PrimEngName ENAME
+	From CCSDB.dbo.CC_ApplyCase A WITH (NOLOCK) 
+	Inner Join CCSDB.dbo.CC_ApplyCaseExamine Exam on Exam.RefNBR = A.RefNBR
+	Inner join CCSDB.dbo.CC_ApplyCreditCard ccard on ccard.RefNBR=A.RefNBR
+	left join DB_Credit.dbo.SC_User CrUsr on CrUsr.UserID=@admUID 
+	left join DB_Credit.dbo.SC_User LcUsr on LcUsr.UserID=@admUID
+	Where 
+	A.ApType='5' and Exam.QueryBSPState = '0' 
+	And
+	 (A.RefNBR + ccard.PrimId) Not In (Select isnull(ApCvNo,'') + isnull(UniNo,'') From DB_CIM.dbo.CV_BatchListBSP WITH (NOLOCK))
+
+	Union
+	Select --永調一般卡
+	'C' SysID, A.RefNBR ApCvNo
+	, A.FMRefNBR AppNo, A.PrimId UniNo, A.PrimIdErr UniNoErr, A.PrimChName CName, '' IdenCd, '' RelCd
+	, @admUID AOEmpID, CrUsr.DeptID AODeptNo, '01' APKindCode, A.ApType LoanKind, '0' RunFlag
+	, @TStamp CreateDate, LcUsr.DeptID LastChgDeptNo, @admUID LastChgID, @TStamp LastChgDate
+	, '' FUNINO, A.PrimEngName ENAME
+	From CCSDB.dbo.CC_ApplyCase A WITH (NOLOCK) 
+	inner join CCSDB.dbo.CC_ApplyAdjCredit adj on adj.RefNBR =A.RefNBR
+	Inner Join CCSDB.dbo.CC_ApplyCaseExamine Exam on Exam.RefNBR = A.RefNBR
+	left join DB_Credit.dbo.SC_User CrUsr on CrUsr.UserID=@admUID
+	left join DB_Credit.dbo.SC_User LcUsr on LcUsr.UserID=@admUID
+	Where 
+	Exam.QueryBSPState = '0'
+	And (A.RefNBR + A.PrimId) Not In (Select isnull(ApCvNo,'') + isnull(UniNo,'') From DB_CIM.dbo.CV_BatchListBSP WITH (NOLOCK))
+) as TAll
+
+2.
+執行完上面的SQL後，如果有資料，則insert資料到CV_BatchListBSP表。
+
+3.
+執行以下SQL:
+declare @TStamp as datetime;
+Set @TStamp = GETDATE();
+
+declare @admUID as varchar(6);
+set @admUID = 'CBATCH';
+
+-------------
+
+with t0 as(	--對每個RefNBR挑選出SecId不同的被授權人
+	  select a.RefNBR, b.SecId, b.SecIdOk
+	  from CCSDB.dbo.CC_ApplyCase a WITH (NOLOCK) 
+	  inner join  CCSDB.dbo.CC_ApplyCreditCard b on a.RefNBR=b.RefNBR
+	  group by a.RefNBR, b.SecId, b.SecIdOk
+),
+ta as(	--取得被授權人姓名
+	  select 
+	  t0.*
+	  , (
+	    select top 1 
+		AppChName
+		from CCSDB.dbo.CC_ApplyCreditCard b WITH (NOLOCK) 
+		where b.RefNBR=t0.RefNBR and b.SecId=t0.SecId
+		) AppChName
+	  , (
+	    select top 1 
+		AppEngName
+		from CCSDB.dbo.CC_ApplyCreditCard b WITH (NOLOCK) 
+		where b.RefNBR=t0.RefNBR and b.SecId=t0.SecId
+		) AppEngName
+	  from t0 	 
+)
+--=====================================================================
+Select 
+	SysID,ApCvNo
+	,ROW_NUMBER() over(partition by ApCvNo order by ApCvNo)
+	  +(select isnull(max(PNo),0) from DB_CIM.dbo.CV_BatchListNG5900 WITH (NOLOCK) where ApCvNo=TAll.ApCvNo)
+	  PNo
+	 ,ROW_NUMBER() over(partition by ApCvNo order by ApCvNo)
+	   +(select isnull(max(PNo),0) from DB_CIM.dbo.CV_BatchListNG5900 WITH (NOLOCK) where ApCvNo=TAll.ApCvNo)
+	   CmpNo
+	,AppNo, UniNo, UniNoErr, CName, IdenCd, RelCd 
+	,AOEmpID, AODeptNo, APKindCode, LoanKind, RunFlag 
+	,CreateDate, LastChgDeptNo, LastChgID, LastChgDate
+	,FUNINO,ENAME
+From (
+	Select --被授權人
+	'C' SysID,
+	A.RefNBR ApCvNo
+	, A.FMRefNBR AppNo, ta.SecId UniNo, ta.SecIdOk UniNoErr, ta.AppChName CName, '' IdenCd, '' RelCd 
+		, @admUID AOEmpID, CrUsr.DeptID AODeptNo, '01' APKindCode, A.ApType LoanKind, '0' RunFlag 
+		, @TStamp CreateDate, LcUsr.DeptID LastChgDeptNo, @admUID LastChgID, @TStamp LastChgDate 
+		, '' FUNINO, ta.AppEngName ENAME
+	From CCSDB.dbo.CC_ApplyCase A WITH (NOLOCK) 
+	inner join ta on ta.RefNBR =A.RefNBR
+	Inner Join CCSDB.dbo.CC_ApplyCaseExamine Exam on Exam.RefNBR = A.RefNBR
+	left join DB_Credit.dbo.SC_User CrUsr on CrUsr.UserID=@admUID 
+	left join DB_Credit.dbo.SC_User LcUsr on LcUsr.UserID=@admUID
+	Where 
+	Exam.QueryBSPState = '0'
+	And (ta.RefNBR + ta.SecId) Not In (Select isnull(ApCvNo,'') + isnull(UniNo,'') From DB_CIM.dbo.CV_BatchListNG5900 WITH (NOLOCK))
+	Union
+	Select --公司
+	'C' SysID,
+	A.RefNBR ApCvNo
+	, A.FMRefNBR AppNo, Company.GUICode UniNo, '' UniNoErr, Company.CompChnName CName, '' IdenCd, '' RelCd
+		, @admUID AOEmpID, CrUsr.DeptID AODeptNo, '01' APKindCode, A.ApType LoanKind, '0' RunFlag 
+		, @TStamp CreateDate, LcUsr.DeptID LastChgDeptNo, @admUID LastChgID, @TStamp LastChgDate 
+		, '' FUNINO, Company.CompEngName ENAME
+	From CCSDB.dbo.CC_ApplyCase A WITH (NOLOCK) 
+	Inner Join CCSDB.dbo.CC_ApplyCaseExamine Exam on Exam.RefNBR = A.RefNBR
+	inner join CCSDB.dbo.CC_ApplyCompany Company on Company.RefNBR=A.RefNBR
+	left join DB_Credit.dbo.SC_User CrUsr on CrUsr.UserID=@admUID 
+	left join DB_Credit.dbo.SC_User LcUsr on LcUsr.UserID=@admUID
+	Where 
+	 Exam.QueryBSPState = '0'
+	And (A.RefNBR + Company.GUICode) Not In (Select isnull(ApCvNo,'') + isnull(UniNo,'') From DB_CIM.dbo.CV_BatchListNG5900 WITH (NOLOCK))
+	
+	Union --特殊處理Company.CeoPersonID
+	Select 
+	'C' SysID,
+	A.RefNBR ApCvNo
+	, A.FMRefNBR AppNo, Company.CeoPersonId UniNo, '' UniNoErr, Company.CeoChnName CName, '' IdenCd, '' RelCd
+		, @admUID AOEmpID, CrUsr.DeptID AODeptNo, '01' APKindCode, A.ApType LoanKind, '0' RunFlag 
+		, @TStamp CreateDate, LcUsr.DeptID LastChgDeptNo, @admUID LastChgID, @TStamp LastChgDate 
+		, '' FUNINO, Company.CeoEngName ENAME
+	From CCSDB.dbo.CC_ApplyCase A WITH (NOLOCK) 
+	Inner Join CCSDB.dbo.CC_ApplyCaseExamine Exam on Exam.RefNBR = A.RefNBR
+	inner join CCSDB.dbo.CC_ApplyCompany Company on Company.RefNBR=A.RefNBR
+	left join DB_Credit.dbo.SC_User CrUsr on CrUsr.UserID=@admUID 
+	left join DB_Credit.dbo.SC_User LcUsr on LcUsr.UserID=@admUID
+	Where 
+	Exam.QueryBSPState = '0' And
+	 (A.RefNBR + Company.CeoPersonId) Not In (Select isnull(ApCvNo,'') + isnull(UniNo,'') From DB_CIM.dbo.CV_BatchListNG5900 WITH (NOLOCK))
+
+	Union --特殊處理單申附卡CreditCard.PrimId
+	Select distinct 
+	'C' SysID,
+	A.RefNBR ApCvNo
+	, A.FMRefNBR AppNo, ccard.PrimId UniNo, '' UniNoErr, '' CName, '' IdenCd, '' RelCd
+		, @admUID AOEmpID, CrUsr.DeptID AODeptNo, '01' APKindCode, A.ApType LoanKind, '0' RunFlag 
+		, @TStamp CreateDate, LcUsr.DeptID LastChgDeptNo, @admUID LastChgID, @TStamp LastChgDate 
+		, '' FUNINO, A.PrimEngName ENAME
+	From CCSDB.dbo.CC_ApplyCase A WITH (NOLOCK) 
+	Inner Join CCSDB.dbo.CC_ApplyCaseExamine Exam on Exam.RefNBR = A.RefNBR
+	Inner join CCSDB.dbo.CC_ApplyCreditCard ccard on ccard.RefNBR=A.RefNBR
+	left join DB_Credit.dbo.SC_User CrUsr on CrUsr.UserID=@admUID 
+	left join DB_Credit.dbo.SC_User LcUsr on LcUsr.UserID=@admUID
+	Where 
+	A.ApType='5' and Exam.QueryBSPState = '0' 
+	And
+	 (A.RefNBR + ccard.PrimId) Not In (Select isnull(ApCvNo,'') + isnull(UniNo,'') From DB_CIM.dbo.CV_BatchListNG5900 WITH (NOLOCK))
+
+	Union
+	Select --永調一般卡
+	'C' SysID, A.RefNBR ApCvNo
+	, A.FMRefNBR AppNo, A.PrimId UniNo, A.PrimIdErr UniNoErr, A.PrimChName CName, '' IdenCd, '' RelCd
+	, @admUID AOEmpID, CrUsr.DeptID AODeptNo, '01' APKindCode, A.ApType LoanKind, '0' RunFlag
+	, @TStamp CreateDate, LcUsr.DeptID LastChgDeptNo, @admUID LastChgID, @TStamp LastChgDate
+	, '' FUNINO, A.PrimEngName ENAME
+	From CCSDB.dbo.CC_ApplyCase A WITH (NOLOCK) 
+	inner join CCSDB.dbo.CC_ApplyAdjCredit adj on adj.RefNBR =A.RefNBR
+	Inner Join CCSDB.dbo.CC_ApplyCaseExamine Exam on Exam.RefNBR = A.RefNBR
+	left join DB_Credit.dbo.SC_User CrUsr on CrUsr.UserID=@admUID
+	left join DB_Credit.dbo.SC_User LcUsr on LcUsr.UserID=@admUID
+	Where 
+	Exam.QueryBSPState = '0'
+	And (A.RefNBR + A.PrimId) Not In (Select isnull(ApCvNo,'') + isnull(UniNo,'') From DB_CIM.dbo.CV_BatchListNG5900 WITH (NOLOCK))
+) as TAll
+
+4.
+執行完第3點SQL後，如果有查詢到資料，將資料insert到CV_BatchListNG5900表
+
