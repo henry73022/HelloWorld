@@ -1,0 +1,50 @@
+CMSOCRUP1-01Job(產出OCRUP1電文至資料表)邏輯筆記
+1.
+查詢CC_ApplyCase表，將ExpFlag【匯出OCRUP1狀態】值為0【未產出】的資料撈出來。
+
+
+2.
+跑迴圈逐筆取出CC_ApplyCase的RefNBR【申編】，
+根據RefNBR【申編】查詢WF_FlowCase表FlowID的欄位值為CBCA000公司卡流程 或 FlowID的欄位值為CCVA000一般信用卡流程，找出FlowCurrStepID流程ID不為一登或二登的資料。
+
+3.
+根據電文分流組各個不同流程電文
+(1)流程代號為CBCA000
+-使用申編在ApplyCase搜尋是否有值，沒有則跳錯
+-使用申編在ApplyExamine搜尋是否有值，沒有則跳錯
+-使用申編在ApplyCompanyRow搜尋是否有值，沒有則不處理
+-使用申編在ApplyCreditCard搜尋是否有值，沒有則跳錯
+
+(2) 流程代號為CCVA000
+-使用申編在ApplyCase搜尋是否有值，沒有則跳錯
+-使用申編在ApplyExamine搜尋是否有值，沒有則跳錯
+-(MS=1)使用申編在ApplyCreditCard搜尋是否有值，沒有則跳錯
+-(MS=2)使用申編在ApplyCreditCard搜尋是否有值，沒有則跳錯
+
+(3) 流程代號為不為CBCA000或CCVA000
+-使用申編在ApplyCase搜尋是否有值，沒有則跳錯
+-使用申編在ApplyExamine搜尋是否有值，沒有則跳錯
+-使用申編在ApplyCompanyRow搜尋是否有值，沒有則不處理
+-使用申編在ApplyCreditCard搜尋是否有值，沒有則跳錯
+
+4.
+根據CC_ApplyCas的RefNBR【申編】執行以下SQL獲取流水序號
+select isnull(max(SerialNo),100) from [CCSDB].[dbo].[CC_FileOutCtl]
+where RefNBR='RefNBR ' and FileKind= '1'
+
+
+5.
+將資料insert到CC_FileOutCtl【檔案匯出控制檔】表，將DataOutputFlag【資料產出註記】設置為N【待產出】
+
+6.
+更新CC_ApplyCase【申請案件主檔】表，將ExpFlag【匯出OCRUP1狀態】設置為1【已產出】、OCRMM1FLAG【產出OCRMM1狀態】設置為1【已產出】
+
+7.
+更新CC_ApplyCaseExamine【徵信案件作業結果檔(單筆)】表，將CVStatus【徵信狀態】設置為4【待外部資料查詢(OCRUP1已產)】
+
+8.
+查詢DB_Credit.WF_FlowCase與CCSDB.CC_ApplyCase查詢案件符合以下條件，需跳關卡(左岸卡 =>CBC1000) (一般卡 => CCV1000) 
+(a) WF_FlowCase.FlowID = CBCA000,CCVA000 
+(b) WF_FlowCase.FlowCurrStepID = CBC0100,CCV0100
+(c) CC_ApplyCase.ExpFlag 不為0 【未產出】
+   。
