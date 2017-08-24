@@ -48,6 +48,10 @@ http://icredit2.test/Default.aspx
 D:\SvnCMS\APPCodeGen\APPCodeGen\bin\Release\APPCodeGen
 執行APPCodeGen來產生DAO，DB的連線方式可以修改APPCodeGen裡的conn.config。
 
+	開發批次程式注意事項:
+當拿到TFS版本要修改程式時，專案可能會欠缺一些參考，此時需要再重新將參考import進專案，參考的擺放位置在以下路徑可找到:
+D:\SvnCMS\Web\CCS\Bin
+找到需要import的參考後重新import進專案，專案即可正常執行。
 
 環境port
 	開發環境	UAT
