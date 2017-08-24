@@ -1,0 +1,20 @@
+本行信用卡相關查詢(CVCredit01)邏輯
+
+1.
+查詢CV_BatchListBSP表，撈出SysID值為C，FUNINO = ""的資料。
+
+2.
+I.	根據CV_BatchListBSP表的UniNo到APDB資料庫tbl_NL_M_CAMDATA表撈取資料。
+II.	根據CV_BatchListBSP表的UniNo到APDB資料庫MSUSERDT表撈取資料。
+III.	根據CV_BatchListBSP表的UniNo到CARDDB資料庫NDADDRM表撈取資料。
+IV.	根據CV_BatchListBSP表的UniNo到CARDDB資料庫NDMCCAMM表撈取資料。
+V.	根據CV_BatchListBSP表的UniNo到USERDB資料庫的tbl_CC_M_JCIC_Warrantor表下where條件(Where W_TEE_ID='UniNo的值'  OR  W_TOR_ID=' UniNo的值')查詢出資料。
+VI.	根據CV_BatchListBSP表的UniNo到USERDB資料庫的CCVERCHAN表查詢資料。
+VII.	將上面到各個表找出的資料放入CV_CreditCard8的DAO，透過UniNo及ApCvNo為條件先刪除DB_CIM資料庫的CV_CreditCard8表資料，之後再將資料insert進CV_CreditCard8表。
+
+3.
+I.	根據CV_BatchListBSP表的UniNo到APDB資料庫的tbl_NL_M_CDMDATA查詢資料。
+II.	根據CV_BatchListBSP表的UniNo及tbl_NL_M_CDMDATA表的CARD欄位值到CARDDB資料庫的NDMCCDMM表撈取資料。
+III.	將上面到各個表找出的資料放入CV_CreditCard9的DAO，透過UniNo及ApCvNo為條件先刪除DB_CIM資料庫的CV_CreditCard9表資料，之後再將資料insert進CV_CreditCard9表。
+
+4.更新DB_CIM的CV_BatchListBSP表，將FUNINO欄位值改為CCType4Job。
