@@ -1,0 +1,35 @@
+本行查詢(CVCredit03)邏輯筆記
+
+1.
+從CV_BatchListBSP表查詢出RunFlag = '0'，將RunFlag更新為 RunFlag = '1'
+
+2.
+CV_BatchListBSP表查詢出RunFlag = '1' 的資料。(要查本行名單)
+
+3.
+將需要查本行的名單筆數寫入Log。
+
+4.
+執行以下SQL獲取前一營業日
+select convert(varchar(30),LastBusDate,112) LastDate  
+ from SC_Calendar 
+where convert(varchar(30),SysDate,112)=convert(varchar(30),getdate(),112) and 
+AreaID='TW'
+
+5.
+透過前一營業日執行以下SQL:
+
+Declare @strSubSQL as varchar(8000) Declare @strSQL as varchar(8000) Set @strSubSQL = ' Select Status exestatus, TableName tablenm' Set @strSubSQL = @strSubSQL + ' From [ODS2].dbo.SC_ImportLog ' Set @strSubSQL = @strSubSQL + ' Where DataDate = '前一營業日'  ' Set @strSubSQL = @strSubSQL + ' And DBName In (''ODS2_DBU'', ''ODS2'') ' Set @strSubSQL = @strSubSQL + ' And TableName In (''CUSTOMER'', ''ACCOUNT'', ''AZ_ACCOUNT'', ''TMB_OS_LGY_TD'', ''LIMIT'', ''LD_LOANS_AND_DEPOSITS'' ' Set @strSubSQL = @strSubSQL + ' , ''MD_DEAL'', ''TMBI_CHQ_RET_DTL'', ''TMB_LN_GUARANTOR'', ''TMB_OD_SWAC_LINK'', ''Z_D0806'', ''Z_L0101'')  ' Set @strSQL = 'Select * From OpenQuery([LNKElending], ''' + Replace(@strSubSQL, '''','''''') + ''')' Execute(@strSQL)
+
+6.
+透過上面執行的SQL判斷ODS2資料是否已轉完成。
+
+=================程式邏輯需另外再看Code了解=============================
+
+7.
+........................懶人包...............
+ 徵信查詢:本行查詢=>
+'(1)比對相同電話地址 (2)比對近6個月徵信 (3) 同一經濟體維護 (4)本行特殊申貸
+'(5)本行支存拒往 (6)本行活存支存 (7)本行定存 (8)本行保證人(5G)
+'(9)本行放款(5L) (10)本行額度 (11) 本行消債條例前置協商 (12) 本行利害關係人
+'(13) 本行保證明細 (14)本行徵信報告維護 比對相同主借款人
