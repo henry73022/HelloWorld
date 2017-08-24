@@ -1,0 +1,21 @@
+CDAMQ(永調MQ上傳電文至主機)邏輯筆記
+
+1.透過CCSDB.CC_ApplyCase表與DB_Credit.WF_FlowCase表找出永調案件清單
+   (條件為:CC_ApplyCase.Exp2Flag ='0'，WF_FlowCase.FlowID = 'CDAA000'，WF_FlowCase.FlowCurrStepID='CDA6000')
+
+2.將清單內案件送MQ，需從CC_ApplyCaseExamine表剔除QuaResult【最終審核結果】不為2【核准】的案件。
+
+3.清單中已核准的案件，從CardDB獲取原卡戶的資料，將資料清單寫入CCSDB.CC_ApplyAdjMQ_RSLT表
+
+4.更新CC_ApplyCase(申請案件主檔)的Exp2Flag(匯出CCSUP1狀態)，送MQ => Exp2Flag='1'【已產出】，不送MQ => Exp2Flag='2'【不須產出】
+
+5.從WF_FlowCase表找出符合FlowID=CDAA000 & FlowCurrStepID=CDA6000 & Exp2Flag] <> 0 的案件清單，
+  將清單內的案件關卡跳至結案關卡CDA9999
+
+
+
+
+
+
+
+
