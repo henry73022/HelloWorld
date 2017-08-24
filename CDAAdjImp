@@ -1,0 +1,22 @@
+AdjCreditJob(永調批次進件)邏輯筆記
+
+1.
+查詢CC_ApplyAdjCredit_Temp表，將OKFLAG【是否已經入正式檔】值為0【未入檔】的資料撈出來。
+
+2.
+I.	透過查詢到的CC_ApplyAdjCredit_Temp資料 ，產生CC_ApplyAdjCredit、CC_ApplyCase、CC_ApplyCaseExamine三個Table的欄位資料。
+II.	判斷CC_ApplyCase表的FlaudFlag的值是否為0，如果不為0不做事。
+III.	判斷結果FlaudFlag的值為0則做以下動作:
+A.	使用CC_FRAUD_ID表進行身分證比對。
+B.	使用CC_FRAUD_MTEL表進行手機比對。
+C.	使用CC_FRAUD_SOURCE表進行來源代碼比對。
+D.	使用CC_FRAUD_TEL表進行電話比對。
+
+3.
+進件前準備，判斷產生RefNBR與FMRefNBR是否被使用，被使用過後產生一組新的RefNBR與FMRefNBR。
+
+4.
+進件作業:將上列資訊insert到下列table:beCC_ApplyCase、beCC_ApplyAdjCredit、beCC_ApplyCaseExamine、beCC_ApplyCaseExamineFlaud(黑名單註記)。
+
+5.
+推關卡至CDA1000，並產生JCIC(聯徵)子流程。
