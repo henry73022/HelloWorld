@@ -1,0 +1,28 @@
+ExamPerfMonthJob(審閱率報表-每月)邏輯筆記
+
+1.
+獲取以下日期:
+(1)sDateStr =>執行批次的月份減一個月的1號。
+EX:執行批次日期為2017/08/28，sDateStr日期為2017/07/01
+(2)eDateStr =>執行批次的月份的1號。
+EX: 執行批次日期為2017/08/28，eDateStr日期為2017/08/01
+(3)sdDateStr =>與sDateStr日期相同。
+(4)edDateStr => sdDateStr日期加一天。
+
+2.
+跑while迴圈(sdDate < eDateStr)
+I.	根據sDateStr及eDateStr執行以下SQL撈取資料
+SQL:
+select isnull(count(acep.AqRefNbr),0) NonPerfCnt  ,isnull(avg(acep.CCWorkDays),0) NonPerfAvg,  isnull(MIN(acep.CCWorkDays),0) NonPerfMin,isnull(MAX(acep.CCWorkDays),0) NonPerfMax  from CC_AqCaseExamPerformance acep, SC_SysConfig sysc  where acep.CCWorkDays > 3 and sysc.ParmValue = '3'  and acep.StartDate >= 'sDateStr' and acep.StartDate < 'eDateStr'
+
+II.	根據sDateStr及eDateStr執行以下SQL撈取資料
+SQL:
+select isnull(count(acep.AqRefNbr),0) PerfCnt  ,isnull(avg(acep.CCWorkDays),0) PerfAvg,  isnull(MIN(acep.CCWorkDays),0) PerfMin,isnull(MAX(acep.CCWorkDays),0) PerfMax  from CC_AqCaseExamPerformance acep, SC_SysConfig sysc  where acep.CCWorkDays <= 3 and sysc.ParmValue = '3'  and acep.StartDate >= ' sDateStr' and acep.StartDate < 'eDateStr'
+
+III.	根據sDateStr及eDateStr執行以下SQL撈取資料
+SQL:
+declare @sDateStr as varchar(10)  declare @sDate as datetime  declare @eDateStr as varchar(10)  declare @eDate as datetime  declare @tStamp as date  set @sDateStr='sDateStr'  set @sDate = Convert(datetime,@sDateStr,120)  set @eDateStr='eDateSt'  set @eDate = Convert(datetime,@eDateStr,120)  set @tStamp=GETDATE();  with t1 as(  select fc.PaperID,fc.FlowCaseID,min(ffl.CrDate ) CrDateA7000 from DB_Credit.dbo.WF_FlowCase fc left join DB_Credit.dbo.WF_FlowFullLog ffl on fc.FlowID=ffl.FlowID and fc.FlowCaseID=ffl.FlowCaseID where fc.FlowID='CAQA000' and ffl.FlowStepID='A7000'  group by fc.PaperID,fc.FlowCaseID ) ,t2 as( select case when DATEPART(hh,CrDateA7000 )<12 then CrDateA7000  else DATEADD(dd,DATEDIFF(dd,0,DATEADD(day,1,CrDateA7000)),0)  end beginDate ,@eDate UpdDate ,ac.CreateDate StartDate ,t1.*,ex.FlowId,ex.AqFinalApprvLevel from t1  inner join CCSDB.dbo.CC_AqApplyCase ac on ac.AqRefNBR=t1.PaperID inner join CCSDB.dbo.CC_AqCaseExamLog ex on ex.AqRefNBR=t1.PaperID and ex.FlowId='CAQA000' and ex.FlowCaseId=t1.FlowCaseID where ex.AqFinalApprvLevel='1' and not exists ( select 1 from DB_Credit.dbo.WF_FlowFullLog ffl where ffl.FlowID='CAQA000' and ffl.FlowCaseID=t1.FlowCaseID and ffl.FlowStepID='A7100' and ffl.FlowLogStatus='Close' and ffl.FlowStepAction like '同意%' and ffl.UpdDate < @eDateStr ) UNION select case when DATEPART(hh,CrDateA7000 )<12 then CrDateA7000 else DATEADD(dd,DATEDIFF(dd,0,DATEADD(day,1,CrDateA7000)),0)  end beginDate ,@eDate UpdDate ,ac.CreateDate StartDate ,t1.*,ex.FlowId,ex.AqFinalApprvLevel from t1 inner join CCSDB.dbo.CC_AqApplyCase ac on ac.AqRefNBR=t1.PaperID inner join CCSDB.dbo.CC_AqCaseExamLog ex on ex.AqRefNBR=t1.PaperID and ex.FlowId='CAQA000' and ex.FlowCaseId=t1.FlowCaseID where ex.AqFinalApprvLevel='2' or ex.AqFinalApprvLevel='3' and not exists ( select 1 from DB_Credit.dbo.WF_FlowFullLog ffl where ffl.FlowID='CAQA000' and ffl.FlowCaseID=t1.FlowCaseID and ffl.FlowStepID='A7100' and ffl.FlowLogStatus='Close' and ffl.FlowStepAction like '同意%' and ffl.UpdDate < @eDateStr ) ) ,t3 as( select DaTEDIFF(Hour,t2.beginDate,t2.UpdDate) elapseHours ,(SELECT count(1) FROM [DB_Credit].[dbo].[SC_Calendar]   where SysDate>=t2.beginDate and SysDate<=t2.UpdDate   and AreaID='TW'and HolidayOrNot='1') holidays ,t2.* from t2 ) ,ta as( select t1.PaperID ,DaTEDIFF(Hour,ffl.CrDate,ffl.UpdDate) PMElapseHours ,(SELECT count(1) FROM [DB_Credit].[dbo].[SC_Calendar]   where SysDate>=ffl.CrDate and SysDate<=ffl.UpdDate   and AreaID='TW'and HolidayOrNot='1') PMHolidays ,ffl.CrDate PMbeginDate,ffl.UpdDate PMUpdDate from t1 inner join DB_Credit.dbo.WF_FlowCase fc on fc.FlowID='CAQA000' and fc.PaperID=t1.PaperID inner join DB_Credit.dbo.WF_FlowFullLog ffl on ffl.FlowID='CAQA000' and ffl.FlowCaseID=fc.FlowCaseID    and ffl.FlowStepID='A7001' and ffl.FlowLogStatus='Close' ) ,tb as( select ta.PaperID ,sum(PMElapseHours) sumPMElapseHours ,sum(PMHolidays) sumPMHolidays from ta group by ta.PaperID ) ,TX as( select ISNULL(tb.sumPMElapseHours,0) sumPMElapseHours ,ISNULL(tb.sumPMHolidays,0) sumPMHolidays,t3.* from t3 left join tb on t3.PaperID=tb.PaperID ) ,TY as( select (Convert(numeric,elapseHours-sumPMElapseHours)/24 - holidays+sumPMHolidays) workDays   ,TX.* from TX ),TZ as( select isnull(count(1),0) ReviewCnt,isnull(avg(workDays),0) ReviewAvg,isnull(min(workDays),0) ReviewMin,isnull(max(workDays),0) ReviewMax from TY where StartDate >= @sDateStr and StartDate < @eDateStr )select * from TZ
+
+IV.	根據上面執行的SQL撈取的資料獲取相關欄位的值，寫入EXCEL檔。
+
+V.	到SC_FileConfig表查詢FileName = 'ReviewRateFlie' and InOutFlag = 'O'，輸出EXCEL檔的位置，將EXCEL輸出到SC_FileConfig配置的路徑。
