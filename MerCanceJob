@@ -1,0 +1,12 @@
+MerCanceJob(解約名單)邏輯筆記
+1.
+到FISCDB的tbl_FISC_R_MERMST_BusinessData表查詢解約名單
+條件為: MM_CANCEL_DATE is not NULL AND MM_CANCEL_DATE<>''
+
+2.
+I.	跑迴圈將資料逐筆取出，根據tbl_FISC_R_MERMST_BusinessData的MM_MERCHANT_NO查詢CCSDB的CC_AqMerchant【申請收單商店主檔】表，找不到資料，Throw New Exception("Can not find CC_AqMerchant.")
+II.	有找到資料:
+(1)判斷AqContractStatus的值是否為1【已解約】，如果為已解約，則跳過不處理。
+(2)更新CC_AqMerchant【申請收單商店主檔】表，將AqContractStatus的值改為1【已解約】，AqProvideNTBFlag【已報送國稅局】改為0【未報送】。
+
+
