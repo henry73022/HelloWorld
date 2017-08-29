@@ -1,4 +1,5 @@
 FISCJob(財金檔上傳與派工)邏輯筆記
+
 ----------------------------------上財金檔案--------------------------------------------------------
 
 1.從WF_FlowCase表找出案件清單(條件:FlowID=CAQA000【特店徵審主流程】 & FlowCurrStepID=A8000【徵審完成-待產檔派工】)
@@ -12,42 +13,40 @@ FISCJob(財金檔上傳與派工)邏輯筆記
 
 5.根據CC_AqApplyCase的AqMerchNo【特約商店代碼】查詢CC_AqMerchant表【申請收單商店主檔】，將CC_AqMerchant表的資料insert資料到CC_AqMerchChgRptHist(國稅局申請增減按月開立發票彙總表)
 
-6.根據CC_AqApplyCase表(申請收單申請案件紀錄主檔)的AqCentralPay欄位【中央付款指示】
-  AqCentralPay為0【付給分店】寫入財金檔路徑01.txt，其餘寫入財金檔路徑02.txt
+6.根據CC_AqApplyCase到CC_AqApplyCase表各欄位取值，組電文。  
+===> FISCHelper的getFmtLines方法有定義電文格式需要的內容。
+
+7.根據CC_AqApplyCase表(申請收單申請案件紀錄主檔)的AqCentralPay欄位【中央付款指示】
+  AqCentralPay為0【付給分店】，將電文內容寫入財金檔路徑01.txt，其餘寫入財金檔路徑02.txt
 
 ------------------------------------派工-------------------------------------------------------------
-7.從WF_FlowCase獲取符合FlowID = CAQA000 & FlowCurrStepID = A8000的案件清單
+8.從WF_FlowCase獲取符合FlowID = CAQA000 & FlowCurrStepID = A8000的案件清單
 
-8.清單中過濾掉CC_AqApplyCase表(申請收單申請案件紀錄主檔)不符合以下條件的案件
+9.清單中過濾掉CC_AqApplyCase表(申請收單申請案件紀錄主檔)不符合以下條件的案件
    (A)[AqDecideFlag]=1(徵審通過) (B)[AqEDCImplementFlag]=Y(需派工) (C)[AqEDCFlag]<>Y (尚未派工) (D)沒有費率子流程或已經結束
 
-9.從FISCDB取得最後的DispatchNo，資料寫入【tbl_FISC_M_Dispatch】、【tbl_FISC_M_Dispatch_Terminal】2張表
+10.更新CC_AqCaseExamLog【特店收單申請案件審核紀錄檔】表的AqCRExamStatus【主流程狀態】，將AqCRExamStatus【主流程狀態】設置為E00【派工完成】
 
-10.更新CC_AqApplyCase(申請收單申請案件紀錄主檔)，將AqEDCFlag【派工單匯出註記】設為Y【已匯出IWEB】，
-   將CC_AqCaseExamLog表(特店收單申請案件審核紀錄檔)的AqCRExamStatus【產檔案件狀態】改為E00【派工完成】
+11.從FISCDB的tbl_FISC_M_Dispatch表找到最後的Dispatch_No【派工單號】，資料寫入【tbl_FISC_M_Dispatch】、【tbl_FISC_M_Dispatch_Terminal】2張表
+
+12.更新CC_AqApplyCase(申請收單申請案件紀錄主檔)，將AqEDCFlag【派工單匯出註記】設為Y【已匯出IWEB】。
 
 ---------------------------------------結束流程--------------------------------------------------------
 
-11.從WF_FlowCase表獲取符合FlowID = CAQA000 & FlowCurrStepID = A8000的案件清單
+13.從WF_FlowCase表獲取符合FlowID = CAQA000 & FlowCurrStepID = A8000的案件清單
 
-12.案件清單過濾掉 
+14.案件清單過濾掉 
    (a)費率子流程未結束  
    (b)CC_AqApplyCase(申請收單申請案件紀錄主檔) AqDecideFlag【申請審核結果】為 1 【通過】
    (c)AqUploadFlag【財金產檔註記】為A,U,N【N:案件未結案 A:新增待上傳 U:修改待上傳】
    (d)AqEDCImplementFlag【是否要派工】為Y【是】 或 AqEDCFlag【派工單匯出註記】為n 【未匯出】
 
-13.WF_FlowCase主檔案件跳關卡至 A9999
+15.WF_FlowCase主檔案件跳關卡至 A9999
 
 --------------------------------------------------------------------------------------------------------
 
-重點:
-1.程式主要是在做流程圖_特約商店徵審完成-待產檔派工A8000到徵審結束A9999的事情(中間無關卡流程區塊)
+補充說明:
+1.程式主要是在做流程圖_特約商店徵審完成-待產檔派工A8000到徵審結束A9999的事情
 
 2.可從DB_Credit.dbo.WF_FlowFullLog查看費率子流程相關資料(代號:P9999【費率子流程結束】)
-
-3.派工及結束流程的部分基本上不太可能會更動，主要要看上財金檔案裡面的邏輯。
-
-
-
-
 
