@@ -1,0 +1,69 @@
+MonthRptJob(發票彙總)邏輯筆記
+1.
+(1)定義areastart日期，areastart日期為執行批次的時間扣一個月的20號
+EX:
+2017/08/28執行批次，areastart日期為2017/07/20 00:00:00
+
+(2) 定義areaend日期，areaend日期為執行批次的日期月份的19號23時59分59秒
+EX:
+2017/08/28執行批次，areaend時間為2017/08/19 23:59:59
+
+2.  EXCEL  sheet
+ (1)Summary 
+根據areastart及areaend執行以下SQL獲取發票彙總資料:
+select ROW_NUMBER() over (order by a.CreateDate)  as 項次, 
+ a.AqRegName as 買受人名稱,
+ '('+ a.AqPhyPostalCD +')'+ a.AqPhyAddr1 as 營業地址,
+ a.AqGUICode as 營利事業統一編號, 
+ case when a.AqContractStatus = '0' then '增' 
+ when a.AqContractStatus='1' then '減' else '' end as 備考增減
+ from  CC_AqMerchChgRptHist a
+ where (1=1)
+ and a.AqProvideNTBFlag = '0'
+ and a.AqContractStatusUptDate between 'areastart' and 'areaend' 
+ order by CreateDate
+
+(1-1)
+根據以下SQL獲取地區名
+select distinct(Desc2) from SC_CodeSetting a where MapSrc ='CCACQ' and MapKind= 'AQRP01'
+
+(2)地區_增
+select ROW_NUMBER() over (order by a.CreateDate)  as 項次, 
+ a.AqRegName as 買受人名稱,
+ '('+ a.AqPhyPostalCD +')'+ a.AqPhyAddr1 as 營業地址,
+ a.AqGUICode as 營利事業統一編號, 
+ case when a.AqContractStatus = '0' then '增' 
+ when a.AqContractStatus='1' then '減' else '' end as 備考增減
+ from  CC_AqMerchChgRptHist a
+ where (1=1)
+ and a.AqProvideNTBFlag = '0'
+ and a.AqContractStatusUptDate between ' areastart ' and ' areaend ' 
+ and  substring(a. AqPhyPostalCD,1,3) in 
+ (select MapCode1 from SC_CodeSetting
+ where MapSrc ='CCACQ' and MapKind= 'AQRP01' 
+ and Desc2=@地區)
+ and a.AqContractStatus='0' 
+ order by CreateDate
+
+(3) 地區_減
+select ROW_NUMBER() over (order by a.CreateDate)  as 項次, 
+ a.AqRegName as 買受人名稱, 
+ '('+ a.AqPhyPostalCD +')'+a.AqPhyAddr1 as 營業地址,
+ a.AqGUICode as 營利事業統一編號, 
+ case when a.AqContractStatus = '0' then '增' 
+ when a.AqContractStatus='1' then '減' else '' end as 備考增減
+ from  CC_AqMerchChgRptHist a
+ where (1=1)
+ and a.AqProvideNTBFlag = '0'
+ and a.AqContractStatusUptDate between ' areastart ' and ' areaend '  and   substring(a. AqPhyPostalCD,1,3) in 
+ (select MapCode1 from SC_CodeSetting
+ where MapSrc ='CCACQ' and MapKind= 'AQRP01' 
+ and Desc2=@地區)
+ and a.AqContractStatus='1' 
+ order by CreateDate
+
+3.
+到SC_FileConfig表查詢FileName = 'GUICodeMonth' and InOutFlag = 'O'的資料，獲取輸出EXCEL及TXT檔的路徑。
+
+4.
+將檔案匯出，最後輸出多個TXT檔、一份EXCEL檔、一個壓縮檔。
