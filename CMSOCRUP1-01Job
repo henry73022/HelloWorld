@@ -34,7 +34,7 @@ where RefNBR='RefNBR ' and FileKind= '1'
 
 
 5.
-將資料insert到CC_FileOutCtl【檔案匯出控制檔】表，將DataOutputFlag【資料產出註記】設置為N【待產出】
+將資料insert到CC_FileOutCtl【檔案匯出控制檔】表，將DataOutputFlag【資料產出註記】設置為N【待產出】，將電文格式的字串塞到DataContent【檔案內容】
 
 6.
 更新CC_ApplyCase【申請案件主檔】表，將ExpFlag【匯出OCRUP1狀態】設置為1【已產出】、OCRMM1FLAG【產出OCRMM1狀態】設置為1【已產出】
