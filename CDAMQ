@@ -1,21 +1,32 @@
 CDAMQ(永調MQ上傳電文至主機)邏輯筆記
 
+
 1.透過CCSDB.CC_ApplyCase表與DB_Credit.WF_FlowCase表找出永調案件清單
-   (條件為:CC_ApplyCase.Exp2Flag ='0'，WF_FlowCase.FlowID = 'CDAA000'，WF_FlowCase.FlowCurrStepID='CDA6000')
+SQL如下:
+select ac.* from CCSDB.dbo.CC_ApplyCase ac  inner join DB_Credit.dbo.WF_FlowCase fc on ac.RefNBR=fc.PaperID  where ac.Exp2Flag ='0' and fc.FlowID in ('CDAA000')  and fc.FlowCurrStepID='CDA6000' order by fc.CrDate, fc.UpdDate
 
-2.將清單內案件送MQ，需從CC_ApplyCaseExamine表剔除QuaResult【最終審核結果】不為2【核准】的案件。
+2.
+跑迴圈，根據CC_ApplyCase表的RefNBR查詢CC_ApplyAdjCredit表，查無資料則報錯。
+Throw New Exception("Can not find CC_ApplyAdjCredit")
 
-3.清單中已核准的案件，從CardDB獲取原卡戶的資料，將資料清單寫入CCSDB.CC_ApplyAdjMQ_RSLT表
+3.
+CC_ApplyCase表的RefNBR查詢CC_ApplyCaseExamine【徵信案件作業結果檔(單筆)】表，查無資料則報錯。
+Throw New Exception("Can not find CC_ApplyCaseExamine")
 
-4.更新CC_ApplyCase(申請案件主檔)的Exp2Flag(匯出CCSUP1狀態)，送MQ => Exp2Flag='1'【已產出】，不送MQ => Exp2Flag='2'【不須產出】
+4.
+根據CC_ApplyCaseExamine【徵信案件作業結果檔(單筆)】表的QuaResult【最終審核結果】判斷是否送MQ
+I.	QuaResult【最終審核結果】為2 =>核准件，須送MQ
+II.	QuaResult【最終審核結果】不為2 =>非核准件，不送MQ
 
-5.從WF_FlowCase表找出符合FlowID=CDAA000 & FlowCurrStepID=CDA6000 & Exp2Flag] <> 0 的案件清單，
-  將清單內的案件關卡跳至結案關卡CDA9999
+5.
+需送MQ的案件:
+(1)根據CC_ApplyCase表的PrimId 及PrimIdErr兩個欄位值相串變primID11變數值，根據primID11到CARDDB資料庫執行以下SQL獲取原卡戶的資料
+select  c.ID_NBR,c.NAME,b.LINE_CR,a.CARD,a.CRLIMIT_PERM,a.U_STATUS from CardDB.dbo.NDMCCDMM a ,CardDB.dbo.NDMCCAMM b  ,CardDB.dbo.NDMCCUMM c  where a.P_ID_NBR='@primID11'  and b.P_ID_NBR=a.P_ID_NBR and b.P_ID_ERR=a.P_ID_ERR and c.ID_NBR=a.ID_NBR and c.ID_ERR=a.ID_ERR    and a.PROD>='100'
 
+(2) 將資料清單update到CCSDB.CC_ApplyAdjMQ_RSLT表，如果update的筆數為零筆，則將資料insert到CC_ApplyAdjMQ_RSLT表。
+6.
+更新CC_ApplyCase【申請案件主檔】表，根據是否需送MQ來決定Exp2Flag【匯出CCSUP1狀態】
+的值。(須送MQ:Exp2Flag = "1"【已產出】，不需送MQ:Exp2Flag = "2"【不需產出】)
 
-
-
-
-
-
-
+7.
+從WF_FlowCase表找出符合FlowID=CDAA000 & FlowCurrStepID=CDA6000 & Exp2Flag] <> 0 的案件清單，將清單內的案件關卡跳至結案關卡CDA9999。
