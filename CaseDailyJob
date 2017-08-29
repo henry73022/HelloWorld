@@ -1,11 +1,135 @@
 CaseDailyJob(每日特店徵審核准拒絕清單)邏輯筆記
 
-1.根據SQL條件查詢特店徵審已核准清單
+1.
+根據以下SQL條件查詢特店徵審已核准清單
+select ROW_NUMBER() over (order by rpt.進件日期) as 項次, 
+ * from 
+ 　(select ((Case
+ 　when a.AqEDCImplementFlag = 'Y' then '待派工'
+ 　when a.AqEDCImplementFlag = 'N' And a.AqEDCImpDelayReason is not null  then '暫緩派工'
+ 　when a.AqEDCImplementFlag = 'N' And ISNULL(a.AqEDCImpDelayReason,'') = '' then '不需派工' END)) as 派工狀態,
+ 　a.AqRefNBR as 申請編號,
+ 　a.AqCCTogatherRefNbr as 主申請編號, 
+ 　a.AqMerchNo as 特店代號, 
+ 　a.AqGUICode as 統一編號, 
+ 　a.AqBizName as 特店營業名稱, 
+ 　a.AqContractDate as 簽約日期, 
+ 　convert(varchar,a.CreateDate,120) as 進件日期, 
+ 　d.DispatchNo as 派工單號, 
+ 　((Case when ISNULL(d.EDCVenderNo,'') <>''  then  d.EDCVenderNo 
+ 　when ISNULL(d.EDCOthVenderNo,'') <>''  then d.EDCOthVenderNo END)) as 端末機型號,
+ 　d.EDC_Cnt as 端末機數量, 
+ 　((case when  ISNULL(d.EDCTermId,'') <>''  then  d.EDCTermId 
+ 　when  ISNULL(d.EDCOthTermId,'') <>''  then d.EDCOthTermId END)) as 端末機代號,
+ 　a.AqEDCImpDelayReason as 暫緩派工原因,
+ 　　(select '('+ AqCorrPostalCD+')' + a.AqCorrAddr1+ a.AqCorrAddr2+ 
+ 　　a.AqCorrAddr3+ a.AqCorrAddr4+ a.AqCorrAddr5 )as 帳單地址
+ 　　from CC_AqApplyCase a Left Outer Join CC_AqCaseExamLog b on  a.AqRefNBR=b.AqRefNBR ,CC_AqApplyCaseEDCAmt d
+ 　　where (1=1)
+ 　　and a.AqRefNBR=d.AqRefNBR 
+ 　　and a.AqUploadFlag ='Y' 
+ 　　and a.AqEDCImplementFlag='Y' 
+ 　　and (b.AqCRExamStatus in ('C60','F00','E00','E11') or b.AqCRExamStatus is NULL)
+ 　　and ( ISNULL(CONVERT(varchar(8),d.EDCVenderNo),'')<>'' or ISNULL(CONVERT(varchar(8),d.EDCOthVenderNo),'') <>'') 
+ 　　and  a.AqRefNBR in 
+ 　　　(select AqRefNBR from CC_AqApplyCaseMap 
+ 　　　where AqCCTogatherRefNbr in 
+ 　　　　(select AqRefNBR from CC_AqCaseExamLog 
+ 　　　　where  LastChgDate between '@ApprovedDateStart' and ' @ApprovedDateEnd' 
+ 　　　　and AqExamResult='1') 
+ 　　　and AqCCTogatherFlag='1' 
+ 　　　union 
+ 　　　select AqRefNBR from CC_AqApplyCase 
+ 　　　where AqRefNBR in
+ 　　　　(select AqRefNBR from CC_AqCaseExamLog 
+ 　　　　where  LastChgDate between '@ApprovedDateStart' and '@ApprovedDateEnd' 
+ 　　　　and AqExamResult='1' ) 
+ 　　　and AqCCTogatherFlag='0')
+ 　　Union 
+ 　　select ((Case 
+ 　　when a.AqEDCImplementFlag = 'Y' then '待派工'
+ 　　when a.AqEDCImplementFlag = 'N' And a.AqEDCImpDelayReason is not null  then '暫緩派工'
+ 　　when a.AqEDCImplementFlag = 'N' And ISNULL(a.AqEDCImpDelayReason,'') = '' then '不需派工' END)) as 派工狀態,
+ 　　a.AqRefNBR as 申請編號,
+ 　　a.AqCCTogatherRefNbr as 主申請編號, 
+ 　　a.AqMerchNo as 特店代號, 
+ 　　a.AqGUICode as 統一編號, 
+ 　　a.AqBizName as 特店營業名稱, 
+ 　　a.AqContractDate as 簽約日期, 
+ 　　convert(varchar,a.CreateDate,120) as 進件日期, 
+ 　　'' as 派工單號, 
+ 　　'' as 端末機型號, 
+ 　　'0' as 端末機數量,
+ 　　'' as 端末機代號,
+ 　　a.AqEDCImpDelayReason as 暫緩派工原因, 
+ 　　　(select '('+ AqCorrPostalCD+')' + a.AqCorrAddr1+ a.AqCorrAddr2+ 
+ 　　　a.AqCorrAddr3+ a.AqCorrAddr4+ a.AqCorrAddr5 )as 帳單地址
+ 　　　from CC_AqApplyCase a Left Outer Join CC_AqCaseExamLog b on  a.AqRefNBR=b.AqRefNBR 
+ 　　　where (1=1)
+ 　　　and (b.AqCRExamStatus in ('C60','F00','E00','E11') or b.AqCRExamStatus is NULL)
+ 　　　and a.AqUploadFlag ='Y' 
+ 　　　and a.AqEDCImplementFlag='N'
+ 　　　and a.AqRefNBR in 
+ 　　　　(select AqRefNBR from CC_AqApplyCaseMap where AqCCTogatherRefNbr in 
+ 　　　　　(select AqRefNBR from CC_AqCaseExamLog where  LastChgDate between '@ApprovedDateStart' and '@ApprovedDateEnd' 
+ 　　　　　and AqExamResult='1') 
+ 　　　　and AqCCTogatherFlag='1' 
+ 　　　　union 
+ 　　　　select AqRefNBR from CC_AqApplyCase where AqRefNBR in
+ 　　　　　(select AqRefNBR from CC_AqCaseExamLog where  LastChgDate between '@ApprovedDateStart' and '@ApprovedDateEnd' 
+ 　　　　　and AqExamResult='1' ) 
+ 　　　　and AqCCTogatherFlag='0')) rpt 
 
-2.從SC_FileConfig(檔案格式定義檔)表查詢符合FileName='ApprovedFlie' and InOutFlag='O'的檔案路徑，
-  將清單內的資料寫入EXCEL檔，將EXCEL檔存放在DB指定的路徑。
+2.
+從SC_FileConfig(檔案格式定義檔)表查詢符合FileName='ApprovedFlie' and InOutFlag='O'的檔案路徑，將清單內的資料寫入EXCEL檔，將EXCEL檔存放在DB指定的路徑。
 
-3.根據SQL條件查詢特店徵審取消與拒絕清單
 
-2.從SC_FileConfig(檔案格式定義檔)表查詢符合FileName='CanceledFlie' and InOutFlag='O'的檔案路徑，
-  將清單內的資料寫入EXCEL檔，將EXCEL檔存放在DB指定的路徑。
+
+
+
+
+
+
+
+
+
+
+3.
+根據以下SQL條件查詢特店徵審取消與拒絕清單
+select ROW_NUMBER() over (order by a.LastChgDate) as 項次,
+ case when a.AqDecideFlag = '2' then '拒絕申請' 
+ when a.AqDecideFlag = '4'  then '取消申請' ELSE a.AqDecideFlag 
+ end as 徵審狀態,
+ a.AqRefNBR as 申請編號,a.AqCCTogatherRefNbr as 主申請編號,
+ a.AqMerchNo as 特店代號,a.AqGUICode as 統一編號,a.AqBizName as 特店營業名稱,
+ a.AqContractDate as 簽約日期,convert (varchar,a.CreateDate,120) as 進件日期,
+ d.DispatchNo as 派工單號,
+ case when  ISNULL(d.EDCVenderNo,'') <>''  then  d.EDCVenderNo 
+ when  ISNULL(d.EDCOthVenderNo,'') <>''  then d.EDCOthVenderNo
+ END as 端末型號 ,
+ d.EDC_Cnt as 端末機數量,
+ case when  ISNULL(d.EDCTermId,'') <>''  then  d.EDCTermId 
+ when  ISNULL(d.EDCOthTermId,'') <>''  then d.EDCOthTermId
+ END 端末機型號,
+ a.AqEDCImpDelayReason as 暫緩派工原因,
+ ('('+ AqCorrPostalCD+')' + a.AqCorrAddr1+ a.AqCorrAddr2+ 
+ a.AqCorrAddr3+ a.AqCorrAddr4+ a.AqCorrAddr5 )as 帳單地址
+ from CC_AqApplyCase a Left Outer Join CC_AqCaseExamLog b on  a.AqRefNBR=b.AqRefNBR  ,CC_AqApplyCaseEDCAmt d
+ where(1=1)
+ and a.AqRefNBR = d.AqRefNBR
+ and (d.EDCVenderNo <>'' or d.EDCOthVenderNo <>'') 
+ and  a.AqRefNBR in 
+ 　(select AqRefNBR from CC_AqApplyCaseMap where AqCCTogatherRefNbr in 
+ 　　(select AqRefNBR from CC_AqCaseExamLog where   
+ 　　LastChgDate between '@CanceledDateStart' and '@CanceledDateEnd'   and
+ 　　AqCRExamStatus in ('C60','C11','B11') and 
+ 　　AqExamResult in ('2', '4'))
+ 　and AqCCTogatherFlag='1' union 
+ 　select AqRefNBR from CC_AqCaseExamLog where 
+ 　LastChgDate between '@CanceledDateStart' and '@CanceledDateEnd'   and 
+ 　AqCRExamStatus in ('C60','C11','B11')  and 
+ 　AqExamResult in ('2', '4')
+ 　and AqCCTogatherFlag='0' )
+
+4.
+.從SC_FileConfig(檔案格式定義檔)表查詢符合FileName='CanceledFlie' and InOutFlag='O'的檔案路徑，將清單內的資料寫入EXCEL檔，將EXCEL檔存放在DB指定的路徑。
