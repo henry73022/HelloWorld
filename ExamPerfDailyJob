@@ -1,0 +1,33 @@
+ExamPerfDailyJob(審閱率報表-每日)邏輯筆記
+
+1.
+在命令列(CMD)指定起始與結束日期
+
+2.
+如果沒有指定起始日期則利用以下SQL獲取起始日期
+select StartDateTime from SC_BatchResult where ProgramName  ='ExamPerfDailyJob' and StartDateTime= ( select max(StartDateTime) StartDateTime from SC_BatchResult where ProgramName='ExamPerfDailyJob'and WorkFlag='1' )
+
+3.
+如果沒有指定結束日期，結束日期的值為執行批次的日期。
+
+4.
+根據起始日期及結束日期執行以下SQL獲取審閱率每日的資料
+
+with t1 as(  select fc.PaperID,fc.FlowCaseID,min(ffl.CrDate ) CrDateA7000 from DB_Credit.dbo.WF_FlowCase fc left join DB_Credit.dbo.WF_FlowFullLog ffl on fc.FlowID=ffl.FlowID and fc.FlowCaseID=ffl.FlowCaseID where fc.FlowID='CAQA000' and ffl.FlowStepID='A7000' and ffl.FlowLogStatus='Close' group by fc.PaperID,fc.FlowCaseID ) ,t2 as( select case when DATEPART(hh,CrDateA7000 )<12 then CrDateA7000  else DATEADD(dd,DATEDIFF(dd,0,DATEADD(day,1,CrDateA7000)),0)  end beginDate ,ffl.UpdDate, ac.CreateDate StartDate ,ffl.ToUser, ffl.ToUserName,t1.*,ex.FlowId,ex.AqFinalApprvLevel ,ffl.FlowStepAction,ffl.FlowLogBatNo from t1  inner join CCSDB.dbo.CC_AqApplyCase ac on ac.AqRefNBR=t1.PaperID inner join CCSDB.dbo.CC_AqCaseExamLog ex on ex.AqRefNBR=t1.PaperID and ex.FlowId='CAQA000' and ex.FlowCaseId=t1.FlowCaseID inner join DB_Credit.dbo.WF_FlowFullLog ffl on ffl.FlowID='CAQA000' and ffl.FlowCaseID=t1.FlowCaseID    and ffl.FlowStepID='A7100' and ffl.FlowLogStatus='Close' and ffl.FlowStepAction like '同意%'   and ffl.UpdDate>='起始日期' and ffl.UpdDate<'結束日期' where ex.AqFinalApprvLevel='1' UNION select case when DATEPART(hh,CrDateA7000 )<12 then CrDateA7000 else DATEADD(dd,DATEDIFF(dd,0,DATEADD(day,1,CrDateA7000)),0)  end beginDate ,ffl.UpdDate  , ac.CreateDate StartDate ,ffl.ToUser, ffl.ToUserName,t1.*,ex.FlowId,ex.AqFinalApprvLevel ,ffl.FlowStepAction,ffl.FlowLogBatNo from t1 inner join CCSDB.dbo.CC_AqApplyCase ac on ac.AqRefNBR=t1.PaperID inner join CCSDB.dbo.CC_AqCaseExamLog ex on ex.AqRefNBR=t1.PaperID and ex.FlowId='CAQA000' and ex.FlowCaseId=t1.FlowCaseID inner join DB_Credit.dbo.WF_FlowFullLog ffl on ffl.FlowID='CAQA000' and ffl.FlowCaseID=t1.FlowCaseID   and ffl.FlowStepID='A7200' and ffl.FlowLogStatus='Close' and ffl.FlowStepAction like '同意%'   and ffl.UpdDate>='起始日期' and ffl.UpdDate<'結束日期' where ex.AqFinalApprvLevel='2' or ex.AqFinalApprvLevel='3' ) ,t3 as( select DaTEDIFF(Hour,t2.beginDate,t2.UpdDate) elapseHours ,(SELECT count(1) FROM [DB_Credit].[dbo].[SC_Calendar]   where SysDate>=t2.beginDate and SysDate<=t2.UpdDate   and AreaID='TW'and HolidayOrNot='1') holidays ,t2.* from t2 ) ,ta as( select t1.PaperID ,DaTEDIFF(Hour,ffl.CrDate,ffl.UpdDate) PMElapseHours ,(SELECT count(1) FROM [DB_Credit].[dbo].[SC_Calendar]   where SysDate>=ffl.CrDate and SysDate<=ffl.UpdDate   and AreaID='TW'and HolidayOrNot='1') PMHolidays ,ffl.CrDate PMbeginDate,ffl.UpdDate PMUpdDate from t1 inner join DB_Credit.dbo.WF_FlowCase fc on fc.FlowID='CAQA000' and fc.PaperID=t1.PaperID inner join DB_Credit.dbo.WF_FlowFullLog ffl on ffl.FlowID='CAQA000' and ffl.FlowCaseID=fc.FlowCaseID    and ffl.FlowStepID='A7001' and ffl.FlowLogStatus='Close' ) ,tb as( select ta.PaperID ,sum(PMElapseHours) sumPMElapseHours ,sum(PMHolidays) sumPMHolidays from ta group by ta.PaperID ) ,TX as( select ISNULL(tb.sumPMElapseHours,0) sumPMElapseHours ,ISNULL(tb.sumPMHolidays,0) sumPMHolidays,t3.* from t3 left join tb on t3.PaperID=tb.PaperID ) ,TY as( select (Convert(numeric,elapseHours-sumPMElapseHours)/24 - holidays+sumPMHolidays) workDays   ,TX.* from TX ) select * from TY
+
+5.
+跑迴圈逐筆取出資料，根據WF_FlowCase 表的PaperID【申編】，查詢CC_AqApplyCaseMap【申請收單申請案件索引主檔】表。 
+(WF_FlowCase 表的PaperID【申編】= CC_AqApplyCaseMap表的AqCCTogatherRefNbr【共通連審主要申編】)
+
+
+
+6.
+如果透過WF_FlowCase 表的PaperID【申編】查詢CC_AqApplyCaseMap【申請收單申請案件索引主檔】表:
+I.	沒有資料:
+將PaperID【申編】等相關資料insert到CC_AqCaseExamPerformance【徵審審閱率明細】表。
+
+II.	有資料:
+逐筆跑迴圈，取出CC_AqApplyCaseMap【申請收單申請案件索引主檔】表的AqRefNBR【特店收單申請編號(detail)】等相關資料insert到CC_AqCaseExamPerformance【徵審審閱率明細】表。
+
+
+
